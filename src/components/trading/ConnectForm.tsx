@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
-import { Loader2, Key, Wifi, WifiOff, Shield } from 'lucide-react';
+import { Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 
 const ConnectForm: React.FC = () => {
-  const [apiToken, setApiToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showToken, setShowToken] = useState(false);
   
   const { connect, disconnect, connectionStatus, accountInfo, accountType, setAccountType } = useTradingContext();
   const { user, isLoaded } = useUser();
@@ -15,10 +13,9 @@ const ConnectForm: React.FC = () => {
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let tokenToUse = apiToken.trim();
+    let tokenToUse = '';
     
-    // If no token entered, try to use stored token
-    if (!tokenToUse && isLoaded && user) {
+    if (isLoaded && user) {
       const metadata = user.unsafeMetadata as {
         demoToken?: string;
         realToken?: string;
@@ -27,8 +24,8 @@ const ConnectForm: React.FC = () => {
     }
 
     if (!tokenToUse) {
-      toast.error('No API token provided', {
-        description: 'Please enter a token or save one in settings'
+      toast.error('No API token found', {
+        description: 'Please save your API tokens in the Settings first.'
       });
       return;
     }
@@ -40,13 +37,11 @@ const ConnectForm: React.FC = () => {
       // Error handled in context
     } finally {
       setIsLoading(false);
-      setApiToken(''); // Clear token for security after attempt
     }
   };
 
   const handleDisconnect = () => {
     disconnect();
-    setApiToken('');
   };
 
   const isConnected = connectionStatus === 'connected';
@@ -98,16 +93,30 @@ const ConnectForm: React.FC = () => {
 
       {!isConnected ? (
         <form onSubmit={handleConnect} className="space-y-4">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg ${
+              accountType === 'real'
+                ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 shadow-amber-500/20'
+                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-blue-500/20'
+            } disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white`}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <Wifi className="w-4 h-4" />
+                Connect {accountType === 'real' ? 'Real' : 'Demo'} Account
+              </>
+            )}
+          </button>
+
           <p className="text-xs text-slate-500 text-center">
-            Get your API token from{' '}
-            <a
-              href="https://app.deriv.com/account/api-token"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline"
-            >
-              Deriv Settings
-            </a>
+            Token will be retrieved from your settings.
           </p>
         </form>
       ) : (

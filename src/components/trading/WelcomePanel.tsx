@@ -114,7 +114,7 @@ const WelcomePanel: React.FC = () => {
               2
             </span>
             <span className="text-slate-400">
-              Enter your token in the connection form and click Connect
+              Open Settings (gear icon) and save your API tokens for Demo and Real accounts
             </span>
           </li>
           <li className="flex items-start gap-3">
@@ -122,7 +122,7 @@ const WelcomePanel: React.FC = () => {
               3
             </span>
             <span className="text-slate-400">
-              Configure your trading and risk settings (contract, stake, limits)
+              Select your account type (Demo/Real) in the connection form and click Connect
             </span>
           </li>
           <li className="flex items-start gap-3">

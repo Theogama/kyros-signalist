@@ -121,25 +121,6 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [handleAccountUpdate, handleMT5Update]);
 
-  // Auto-connect when tokens are available in user metadata
-  useEffect(() => {
-    if (isLoaded && user && connectionStatus === 'disconnected') {
-      const metadata = user.unsafeMetadata as {
-        demoToken?: string;
-        realToken?: string;
-      };
-      
-      const tokenToUse = accountType === 'real' ? metadata.realToken : metadata.demoToken;
-      
-      if (tokenToUse) {
-        connect(tokenToUse).catch(() => {
-          // Silent fail on auto-connect, user can try manually
-          console.warn('Auto-connect failed');
-        });
-      }
-    }
-  }, [isLoaded, user, accountType, connect]);
-
   // Set Account Type
   const setAccountType = useCallback((type: AccountType) => {
     if (connectionStatus === 'connected') {
