@@ -1,5 +1,4 @@
 import {
-  Bot, 
   Shield, 
   Zap, 
   TrendingUp, 
@@ -8,17 +7,19 @@ import {
   ExternalLink,
   ChevronRight
 } from 'lucide-react';
+import Logo from './Logo';
+import React from "react";
 
 const WelcomePanel: React.FC = () => {
   return (
     <div className="bg-[#0f1629] rounded-xl border border-[#1e2a4a] p-6 shadow-lg">
       {/* Hero Section */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 mb-4 shadow-lg shadow-blue-500/30">
-          <Bot className="w-8 h-8 text-white" />
+        <div className="inline-flex items-center justify-center mb-4">
+          <Logo showText={true} className="h-16 w-auto" />
         </div>
         <h2 className="text-2xl font-bold text-white mb-2">
-          Welcome to Kyros Signalist
+          Welcome to Kyros <span className="text-blue-400">Signalist</span>
         </h2>
         <p className="text-slate-400 max-w-md mx-auto">
           Your automated trading companion for Deriv synthetic indices. 

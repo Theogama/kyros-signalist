@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
 import { 
-  Bot, 
   Settings, 
   HelpCircle, 
   ExternalLink,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import HelpModal from './HelpModal';
 import SettingsModal from './SettingsModal';
+import Logo from './Logo';
 import { UserButton } from '@clerk/clerk-react';
 
 interface HeaderProps {
@@ -39,9 +39,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
             
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <Bot className="w-6 h-6 text-white" />
-                </div>
+                <Logo showText={false} className="w-10 h-10 flex items-center justify-center" />
                 {isConnected && (
                   <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0f1629] ${
                     accountType === 'real' ? 'bg-amber-400' : 'bg-blue-400'
