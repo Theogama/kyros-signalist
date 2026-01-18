@@ -29,8 +29,8 @@ const TradeLog: React.FC = () => {
       trade.accountType || 'unknown',
       trade.contractType,
       trade.symbol,
-      trade.entryPrice.toFixed(4),
-      trade.exitPrice.toFixed(4),
+      trade.entryPrice.toFixed(2),
+      trade.exitPrice.toFixed(2),
       trade.stake.toFixed(2),
       trade.profit.toFixed(2),
       trade.result
@@ -154,10 +154,10 @@ const TradeLog: React.FC = () => {
                     </span>
                   </div>
                   <div className="col-span-2 text-white font-mono text-xs">
-                    {trade.entryPrice.toFixed(4)}
+                    {trade.entryPrice.toFixed(2)}
                   </div>
                   <div className="col-span-2 text-white font-mono text-xs">
-                    {trade.exitPrice.toFixed(4)}
+                    {trade.exitPrice.toFixed(2)}
                   </div>
                   <div className={`col-span-2 font-mono font-medium ${
                     trade.profit > 0 ? 'text-emerald-400' : 'text-red-400'

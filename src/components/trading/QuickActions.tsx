@@ -37,8 +37,8 @@ const QuickActions: React.FC = () => {
       new Date(trade.timestamp).toISOString(),
       trade.contractType,
       trade.symbol,
-      trade.entryPrice.toFixed(4),
-      trade.exitPrice.toFixed(4),
+      trade.entryPrice.toFixed(2),
+      trade.exitPrice.toFixed(2),
       trade.stake.toFixed(2),
       trade.profit.toFixed(2),
       trade.result

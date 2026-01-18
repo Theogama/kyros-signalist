@@ -32,7 +32,7 @@ const LiveIndicator: React.FC = () => {
               priceDirection === 'up' ? 'text-emerald-400' :
               priceDirection === 'down' ? 'text-red-400' : 'text-white'
             }`}>
-              {lastTick.quote.toFixed(4)}
+              {lastTick.quote.toFixed(2)}
             </p>
           </div>
         )}
@@ -50,7 +50,7 @@ const LiveIndicator: React.FC = () => {
                 {currentTrade.direction}
               </span>
               <span className="text-white text-sm font-mono">
-                @ {currentTrade.entryPrice?.toFixed(4)}
+                @ {currentTrade.entryPrice?.toFixed(2)}
               </span>
             </div>
           </div>

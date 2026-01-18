@@ -55,7 +55,7 @@ const TickStream: React.FC = () => {
               prevTick && lastTick.quote > prevTick.quote ? 'text-emerald-400' :
               prevTick && lastTick.quote < prevTick.quote ? 'text-red-400' : 'text-white'
             }`}>
-              {lastTick.quote.toFixed(4)}
+              {lastTick.quote.toFixed(2)}
             </div>
             <div className="text-slate-500 text-xs font-mono">
               {lastTick.symbol}
@@ -96,8 +96,8 @@ const TickStream: React.FC = () => {
             />
           </svg>
           <div className="flex justify-between text-xs text-slate-500 font-mono mt-1">
-            <span>{minPrice.toFixed(4)}</span>
-            <span>{maxPrice.toFixed(4)}</span>
+            <span>{minPrice.toFixed(2)}</span>
+            <span>{maxPrice.toFixed(2)}</span>
           </div>
         </div>
       )}
@@ -151,7 +151,7 @@ const TickStream: React.FC = () => {
                   direction === 'up' ? 'text-emerald-400' :
                   direction === 'down' ? 'text-red-400' : 'text-white'
                 }`}>
-                  {tick.quote.toFixed(4)}
+                  {tick.quote.toFixed(2)}
                 </span>
               </div>
             );

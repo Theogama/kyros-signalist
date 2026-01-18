@@ -209,7 +209,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       derivWS.subscribeToContract(contractId);
 
       toast.info('Trade placed', {
-        description: `${direction} contract at ${currentTick.quote.toFixed(4)}`,
+        description: `${direction} contract at ${currentTick.quote.toFixed(2)}`,
       });
 
     } catch (error: any) {

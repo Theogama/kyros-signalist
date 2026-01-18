@@ -20,11 +20,25 @@ const SYMBOLS = [
   { value: 'R_50', label: 'Volatility 50 Index', shortLabel: 'V50' },
   { value: 'R_25', label: 'Volatility 25 Index', shortLabel: 'V25' },
   { value: 'R_10', label: 'Volatility 10 Index', shortLabel: 'V10' },
-  { value: '1HZ100V', label: 'Volatility 100 (1s)', shortLabel: 'V100 1s' },
-  { value: '1HZ75V', label: 'Volatility 75 (1s)', shortLabel: 'V75 1s' },
+  { value: '1HZ100V', label: 'Volatility 100 (1s) Index', shortLabel: 'V100 1s' },
+  { value: '1HZ75V', label: 'Volatility 75 (1s) Index', shortLabel: 'V75 1s' },
+  { value: '1HZ50V', label: 'Volatility 50 (1s) Index', shortLabel: 'V50 1s' },
+  { value: '1HZ25V', label: 'Volatility 25 (1s) Index', shortLabel: 'V25 1s' },
+  { value: '1HZ10V', label: 'Volatility 10 (1s) Index', shortLabel: 'V10 1s' },
+  { value: '1HZ15V', label: 'Volatility 15 (1s) Index', shortLabel: 'V15 1s' },
+  { value: '1HZ30V', label: 'Volatility 30 (1s) Index', shortLabel: 'V30 1s' },
+  { value: '1HZ90V', label: 'Volatility 90 (1s) Index', shortLabel: 'V90 1s' },
+  { value: 'RB100', label: 'Range Break 100 Index', shortLabel: 'RB100' },
+  { value: 'RB200', label: 'Range Break 200 Index', shortLabel: 'RB200' },
+  { value: 'JD10', label: 'Jump 10 Index', shortLabel: 'J10' },
+  { value: 'JD25', label: 'Jump 25 Index', shortLabel: 'J25' },
+  { value: 'JD50', label: 'Jump 50 Index', shortLabel: 'J50' },
+  { value: 'JD75', label: 'Jump 75 Index', shortLabel: 'J75' },
+  { value: 'JD100', label: 'Jump 100 Index', shortLabel: 'J100' },
   { value: 'frxXAUUSD', label: 'Gold/USD', shortLabel: 'XAUUSD' },
   { value: 'frxEURUSD', label: 'EUR/USD', shortLabel: 'EURUSD' },
   { value: 'frxGBPUSD', label: 'GBP/USD', shortLabel: 'GBPUSD' },
+  { value: 'frxUSDJPY', label: 'USD/JPY', shortLabel: 'USDJPY' },
 ];
 
 const BotControls: React.FC = () => {
@@ -181,23 +195,23 @@ const BotControls: React.FC = () => {
               <input
                 type="number"
                 min="0.35"
-                max="100"
+                max="5000"
                 step="0.01"
                 value={stakeAmount}
-                onChange={(e) => setStakeAmount(Math.max(0.35, Math.min(100, parseFloat(e.target.value) || 0.35)))}
+                onChange={(e) => setStakeAmount(Math.max(0.35, Math.min(5000, parseFloat(e.target.value) || 0.35)))}
                 disabled={isRunning}
                 className={`w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-3 pl-8 pr-4 text-white font-mono focus:outline-none focus:border-blue-500 transition-all ${
                   isRunning ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               />
             </div>
-            <div className="flex gap-2 mt-2">
-              {[1, 5, 10, 25].map((amount) => (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {[1, 5, 10, 25, 50, 100, 250, 500].map((amount) => (
                 <button
                   key={amount}
                   onClick={() => setStakeAmount(amount)}
                   disabled={isRunning}
-                  className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
+                  className={`flex-1 min-w-[60px] py-1.5 text-xs rounded-md transition-all ${
                     stakeAmount === amount
                       ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
                       : 'bg-[#0a0e27] text-slate-400 border border-[#1e2a4a] hover:border-slate-600'
@@ -229,7 +243,7 @@ const BotControls: React.FC = () => {
             <span className="text-blue-400 text-sm font-medium">Trade in Progress</span>
           </div>
           <p className="text-slate-400 text-xs">
-            {currentTrade.direction} @ {currentTrade.entryPrice?.toFixed(4)}
+            {currentTrade.direction} @ {currentTrade.entryPrice?.toFixed(2)}
           </p>
         </div>
       )}
