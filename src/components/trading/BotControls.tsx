@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
-import { 
-  Play, 
-  Square, 
-  Settings, 
-  Zap, 
-  TrendingUp, 
+import {
+  Play,
+  Square,
+  Settings,
+  Zap,
+  TrendingUp,
   AlertTriangle,
   ChevronDown,
   ChevronUp,
@@ -56,6 +56,9 @@ const BotControls: React.FC = () => {
     accountInfo,
     currentTrade,
     accountType,
+    totalTrades,
+    winRate,
+    totalProfit,
   } = useTradingContext();
 
   const [showSettings, setShowSettings] = useState(true);
@@ -87,6 +90,20 @@ const BotControls: React.FC = () => {
     setShowConfirmStop(false);
   };
 
+  // Calculate risk status
+  const getRiskStatus = () => {
+    if (totalTrades < 5) return { label: 'Warming Up', color: 'text-blue-400' };
+    if (winRate >= 60) return { label: 'Safe', color: 'text-emerald-400' };
+    if (winRate >= 50) return { label: 'Moderate', color: 'text-amber-400' };
+    return { label: 'High Risk', color: 'text-red-400' };
+  };
+
+  const riskStatus = getRiskStatus();
+
+  // Calculate profit factor
+  const wins = totalTrades > 0 ? Math.round((winRate / 100) * totalTrades) : 0;
+  const losses = totalTrades - wins;
+
   return (
     <div className="bg-[#0f1629] rounded-xl border border-[#1e2a4a] p-5 shadow-lg">
       <div className="flex items-center justify-between mb-4">
@@ -101,12 +118,46 @@ const BotControls: React.FC = () => {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="text-slate-400 hover:text-white transition-colors p-2"
-        >
-          {showSettings ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Performance Badges */}
+          {totalTrades > 0 && (
+            <div className="flex gap-2 mr-2">
+              {/* Win Rate Badge */}
+              <div className={`px-2.5 py-1 rounded-md ${winRate >= 50 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                <div className="flex items-center gap-1.5">
+                  <Target className={`w-3 h-3 ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`} />
+                  <span className={`text-xs font-medium ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {winRate.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* P/L Badge */}
+              <div className={`px-2.5 py-1 rounded-md ${totalProfit >= 0 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className={`w-3 h-3 ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+                  <span className={`text-xs font-bold font-mono ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    ${totalProfit.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Risk Status Badge */}
+              <div className="px-2.5 py-1 rounded-md bg-slate-700/30 border border-slate-600/30">
+                <span className={`text-xs font-medium ${riskStatus.color}`}>
+                  {riskStatus.label}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="text-slate-400 hover:text-white transition-colors p-2"
+          >
+            {showSettings ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Settings Panel */}
@@ -116,18 +167,17 @@ const BotControls: React.FC = () => {
           <div>
             <label className="text-slate-400 text-sm mb-2 block">Trading Strategy</label>
 
-            
+
             <div className="mt-3">
               <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 block">Kyros Premium Strategies</label>
               <div className="grid grid-cols-1 gap-2">
                 <button
                   onClick={() => setContractType('kyros_trend')}
                   disabled={isRunning}
-                  className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-between gap-2 ${
-                    contractType === 'kyros_trend'
-                      ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
-                      : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                  } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-between gap-2 ${contractType === 'kyros_trend'
+                    ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
+                    : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex items-center gap-2">
                     <BarChart className="w-4 h-4" />
@@ -135,16 +185,15 @@ const BotControls: React.FC = () => {
                   </div>
                   <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-500">PRO</span>
                 </button>
-                
+
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setContractType('kyros_scalper')}
                     disabled={isRunning}
-                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
-                      contractType === 'kyros_scalper'
-                        ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
-                        : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${contractType === 'kyros_scalper'
+                      ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
+                      : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                      } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <Target className="w-4 h-4" />
                     <span>Scalper</span>
@@ -152,11 +201,10 @@ const BotControls: React.FC = () => {
                   <button
                     onClick={() => setContractType('kyros_reversal')}
                     disabled={isRunning}
-                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
-                      contractType === 'kyros_reversal'
-                        ? 'bg-rose-500/20 border-2 border-rose-500 text-rose-400'
-                        : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${contractType === 'kyros_reversal'
+                      ? 'bg-rose-500/20 border-2 border-rose-500 text-rose-400'
+                      : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                      } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <Repeat className="w-4 h-4" />
                     <span>Reversal</span>
@@ -173,9 +221,8 @@ const BotControls: React.FC = () => {
               value={selectedSymbol}
               onChange={(e) => setSelectedSymbol(e.target.value)}
               disabled={isRunning}
-              className={`w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-3 px-4 text-white focus:outline-none focus:border-blue-500 transition-all ${
-                isRunning ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-3 px-4 text-white focus:outline-none focus:border-blue-500 transition-all ${isRunning ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
             >
               {SYMBOLS.map((symbol) => (
                 <option key={symbol.value} value={symbol.value}>
@@ -200,9 +247,8 @@ const BotControls: React.FC = () => {
                 value={stakeAmount}
                 onChange={(e) => setStakeAmount(Math.max(0.35, Math.min(5000, parseFloat(e.target.value) || 0.35)))}
                 disabled={isRunning}
-                className={`w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-3 pl-8 pr-4 text-white font-mono focus:outline-none focus:border-blue-500 transition-all ${
-                  isRunning ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-3 pl-8 pr-4 text-white font-mono focus:outline-none focus:border-blue-500 transition-all ${isRunning ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
               />
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -211,11 +257,10 @@ const BotControls: React.FC = () => {
                   key={amount}
                   onClick={() => setStakeAmount(amount)}
                   disabled={isRunning}
-                  className={`flex-1 min-w-[60px] py-1.5 text-xs rounded-md transition-all ${
-                    stakeAmount === amount
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                      : 'bg-[#0a0e27] text-slate-400 border border-[#1e2a4a] hover:border-slate-600'
-                  } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`flex-1 min-w-[60px] py-1.5 text-xs rounded-md transition-all ${stakeAmount === amount
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                    : 'bg-[#0a0e27] text-slate-400 border border-[#1e2a4a] hover:border-slate-600'
+                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   ${amount}
                 </button>
@@ -280,9 +325,9 @@ const BotControls: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold">Real Money Trading</h3>
             </div>
-            
+
             <p className="text-slate-300 mb-6 leading-relaxed">
-              You are about to start the bot on a <span className="text-amber-400 font-bold uppercase">Real Account</span>. 
+              You are about to start the bot on a <span className="text-amber-400 font-bold uppercase">Real Account</span>.
               Please ensure you understand the risks involved. Trading can result in financial loss.
             </p>
 

@@ -12,7 +12,8 @@ import {
   Key,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  Target
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@clerk/clerk-react';
@@ -28,7 +29,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [notifications, setNotifications] = useState(true);
   const [autoReconnect, setAutoReconnect] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
-  
+
   // Deriv Tokens
   const [demoToken, setDemoToken] = useState('');
   const [realToken, setRealToken] = useState('');
@@ -43,10 +44,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         realToken?: string;
         settings?: any;
       };
-      
+
       if (metadata.demoToken) setDemoToken(metadata.demoToken);
       if (metadata.realToken) setRealToken(metadata.realToken);
-      
+
       if (metadata.settings) {
         setSoundEnabled(metadata.settings.soundEnabled ?? true);
         setNotifications(metadata.settings.notifications ?? true);
@@ -60,7 +61,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   const handleSave = async () => {
     if (!user) return;
-    
+
     setIsSaving(true);
     try {
       await user.update({
@@ -76,7 +77,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           }
         }
       });
-      
+
       // Also save to localStorage for immediate non-auth related settings
       localStorage.setItem('kyros-settings', JSON.stringify({
         soundEnabled,
@@ -84,7 +85,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         autoReconnect,
         theme
       }));
-      
+
       toast.success('Settings and tokens saved successfully');
       onClose();
     } catch (error: any) {
@@ -123,7 +124,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <Key className="w-3 h-3" />
               Deriv API Tokens
             </h3>
-            
+
             <div className="space-y-3">
               {/* Demo Token */}
               <div className="space-y-1.5">
@@ -164,7 +165,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 </div>
               </div>
-              
+
               <p className="text-[10px] text-slate-500 italic bg-blue-500/5 p-2 rounded border border-blue-500/10">
                 Tokens are stored securely in your private user metadata and used for automatic connection.
               </p>
@@ -192,13 +193,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <button
                   onClick={() => setSoundEnabled(!soundEnabled)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${
-                    soundEnabled ? 'bg-blue-500' : 'bg-slate-700'
-                  }`}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${soundEnabled ? 'bg-blue-500' : 'bg-slate-700'
+                    }`}
                 >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${
-                    soundEnabled ? 'left-[22px]' : 'left-0.5'
-                  }`} />
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${soundEnabled ? 'left-[22px]' : 'left-0.5'
+                    }`} />
                 </button>
               </div>
 
@@ -213,13 +212,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <button
                   onClick={() => setNotifications(!notifications)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${
-                    notifications ? 'bg-blue-500' : 'bg-slate-700'
-                  }`}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${notifications ? 'bg-blue-500' : 'bg-slate-700'
+                    }`}
                 >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${
-                    notifications ? 'left-[22px]' : 'left-0.5'
-                  }`} />
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${notifications ? 'left-[22px]' : 'left-0.5'
+                    }`} />
                 </button>
               </div>
 
@@ -234,13 +231,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <button
                   onClick={() => setAutoReconnect(!autoReconnect)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${
-                    autoReconnect ? 'bg-blue-500' : 'bg-slate-700'
-                  }`}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${autoReconnect ? 'bg-blue-500' : 'bg-slate-700'
+                    }`}
                 >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${
-                    autoReconnect ? 'left-[22px]' : 'left-0.5'
-                  }`} />
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${autoReconnect ? 'left-[22px]' : 'left-0.5'
+                    }`} />
                 </button>
               </div>
             </div>
@@ -254,39 +249,148 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setTheme('dark')}
-                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${
-                    theme === 'dark'
-                      ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
-                      : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                  }`}
+                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${theme === 'dark'
+                    ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
+                    : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                    }`}
                 >
                   <Moon className="w-3.5 h-3.5" />
                   Dark
                 </button>
                 <button
                   onClick={() => setTheme('light')}
-                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${
-                    theme === 'light'
-                      ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
-                      : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                  }`}
+                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${theme === 'light'
+                    ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
+                    : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                    }`}
                 >
                   <Sun className="w-3.5 h-3.5" />
                   Light
                 </button>
                 <button
                   onClick={() => setTheme('system')}
-                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${
-                    theme === 'system'
-                      ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
-                      : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
-                  }`}
+                  className={`py-2 px-1 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all ${theme === 'system'
+                    ? 'bg-blue-500/20 border border-blue-500 text-blue-400'
+                    : 'bg-[#0f1629] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                    }`}
                 >
                   <Monitor className="w-3.5 h-3.5" />
                   System
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="h-px bg-[#1e2a4a]" />
+
+          {/* Kyros Strategy Control Section */}
+          <div className="space-y-4">
+            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+              <Target className="w-3 h-3" />
+              Kyros Strategy Control
+            </h3>
+
+            {/* Info Banner */}
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+              <p className="text-amber-400/80 text-[10px] leading-relaxed">
+                <strong className="text-amber-400">Note:</strong> Advanced strategy settings control risk management and trading behavior.
+                Adjust these carefully based on your risk tolerance and trading goals.
+              </p>
+            </div>
+
+            {/* Risk Management */}
+            <div className="space-y-3">
+              <h4 className="text-slate-500 text-[11px] font-semibold">Risk Management</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Max Consecutive Losses</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="2">2 losses</option>
+                    <option value="3" selected>3 losses</option>
+                    <option value="4">4 losses</option>
+                    <option value="5">5 losses</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Daily Loss Limit</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="5">5%</option>
+                    <option value="10" selected>10%</option>
+                    <option value="15">15%</option>
+                    <option value="20">20%</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Min Win Rate Threshold</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="50">50%</option>
+                    <option value="55">55%</option>
+                    <option value="60" selected>60%</option>
+                    <option value="65">65%</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Stake Reduction</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="20">20%</option>
+                    <option value="30" selected>30%</option>
+                    <option value="40">40%</option>
+                    <option value="50">50%</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Toggle Options */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-[#0a0e27] rounded-lg border border-[#1e2a4a]">
+                  <span className="text-white text-xs">Auto-Pause on Loss Limit</span>
+                  <div className="w-8 h-4 rounded-full bg-blue-500 relative">
+                    <div className="w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 right-0.5"></div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-[#0a0e27] rounded-lg border border-[#1e2a4a]">
+                  <span className="text-white text-xs">Reduce Stake After Loss</span>
+                  <div className="w-8 h-4 rounded-full bg-blue-500 relative">
+                    <div className="w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 right-0.5"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Scalping Parameters */}
+            <div className="space-y-3">
+              <h4 className="text-slate-500 text-[11px] font-semibold">Scalping Parameters</h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Momentum Threshold</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="0.0001">Very Low</option>
+                    <option value="0.0002" selected>Low</option>
+                    <option value="0.0003">Medium</option>
+                    <option value="0.0005">High</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Volatility Filter</label>
+                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[9px] text-slate-600 italic">
+              Settings are saved to your browser. Advanced configuration coming soon for fine-tuned control.
+            </p>
           </div>
         </div>
 

@@ -11,6 +11,7 @@ import PerformanceChart from './PerformanceChart';
 import QuickActions from './QuickActions';
 import WelcomePanel from './WelcomePanel';
 import LiveIndicator from './LiveIndicator';
+import StrategyPerformance from './StrategyPerformance';
 
 const TradingDashboard: React.FC = () => {
   const { connectionStatus, isRunning } = useTradingContext();
@@ -24,7 +25,7 @@ const TradingDashboard: React.FC = () => {
     <div className="min-h-screen bg-[#0a0e27] flex flex-col">
       {/* Header */}
       <Header sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
-      
+
       {/* Status Bar */}
       <StatusBar />
 
@@ -56,7 +57,7 @@ const TradingDashboard: React.FC = () => {
 
         {/* Mobile Overlay */}
         {sidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 z-30 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
@@ -70,6 +71,9 @@ const TradingDashboard: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 h-full">
               {/* Left Column */}
               <div className="space-y-4 lg:space-y-6">
+                {/* Strategy Performance */}
+                <StrategyPerformance />
+
                 {/* Tick Stream */}
                 <div className="h-[400px] lg:h-[500px]">
                   <TickStream />
@@ -100,17 +104,17 @@ const TradingDashboard: React.FC = () => {
             <span className="hidden sm:inline">Powered by Deriv API</span>
           </div>
           <div className="flex items-center gap-4">
-            <a 
-              href="https://api.deriv.com/docs" 
-              target="_blank" 
+            <a
+              href="https://api.deriv.com/docs"
+              target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white transition-colors"
             >
               API Docs
             </a>
-            <a 
-              href="https://deriv.com/terms-and-conditions" 
-              target="_blank" 
+            <a
+              href="https://deriv.com/terms-and-conditions"
+              target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white transition-colors"
             >

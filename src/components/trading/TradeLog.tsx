@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
-import { 
-  History, 
-  TrendingUp, 
-  TrendingDown, 
-  Trash2, 
+import {
+  History,
+  TrendingUp,
+  TrendingDown,
+  Trash2,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -129,17 +129,15 @@ const TradeLog: React.FC = () => {
               {displayedTrades.map((trade, index) => (
                 <div
                   key={trade.id}
-                  className={`grid grid-cols-12 gap-2 px-3 py-3 text-sm border-b border-[#1e2a4a] hover:bg-[#0a0e27] transition-colors ${
-                    index === 0 && currentPage === 1 ? 'bg-blue-500/5' : ''
-                  }`}
+                  className={`grid grid-cols-12 gap-2 px-3 py-3 text-sm border-b border-[#1e2a4a] hover:bg-[#0a0e27] transition-colors ${index === 0 && currentPage === 1 ? 'bg-blue-500/5' : ''
+                    }`}
                 >
                   <div className="col-span-1 text-slate-400 font-mono text-[10px] flex items-center">
                     {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </div>
                   <div className="col-span-1 flex items-center">
-                    <span className={`text-[10px] font-bold px-1 rounded ${
-                      trade.accountType === 'real' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'
-                    }`}>
+                    <span className={`text-[10px] font-bold px-1 rounded ${trade.accountType === 'real' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'
+                      }`}>
                       {trade.accountType === 'real' ? 'R' : 'D'}
                     </span>
                   </div>
@@ -159,17 +157,15 @@ const TradeLog: React.FC = () => {
                   <div className="col-span-2 text-white font-mono text-xs">
                     {trade.exitPrice.toFixed(2)}
                   </div>
-                  <div className={`col-span-2 font-mono font-medium ${
-                    trade.profit > 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}>
+                  <div className={`col-span-2 font-mono font-medium ${trade.profit > 0 ? 'text-emerald-400' : 'text-red-400'
+                    }`}>
                     {trade.profit > 0 ? '+' : ''}${trade.profit.toFixed(2)}
                   </div>
                   <div className="col-span-2 flex justify-end">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      trade.result === 'win'
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${trade.result === 'win'
                         ? 'bg-emerald-500/20 text-emerald-400'
                         : 'bg-red-500/20 text-red-400'
-                    }`}>
+                      }`}>
                       {trade.result.toUpperCase()}
                     </span>
                   </div>
@@ -209,9 +205,8 @@ const TradeLog: React.FC = () => {
       {/* Total P&L Footer */}
       <div className="mt-4 pt-4 border-t border-[#1e2a4a] flex items-center justify-between">
         <span className="text-slate-400 text-sm">Total P&L</span>
-        <span className={`text-xl font-bold font-mono ${
-          totalProfit > 0 ? 'text-emerald-400' : totalProfit < 0 ? 'text-red-400' : 'text-slate-500'
-        }`}>
+        <span className={`text-xl font-bold font-mono ${totalProfit > 0 ? 'text-emerald-400' : totalProfit < 0 ? 'text-red-400' : 'text-slate-500'
+          }`}>
           {totalProfit >= 0 ? '+' : ''}${totalProfit.toFixed(2)}
         </span>
       </div>
