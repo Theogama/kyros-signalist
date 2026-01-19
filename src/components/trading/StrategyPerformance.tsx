@@ -93,65 +93,65 @@ const StrategyPerformance: React.FC = () => {
             </div>
 
             {/* Main Metrics Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
                 {/* Win Rate */}
-                <div className="bg-[#0a0e27] rounded-lg p-3 border border-[#1e2a4a]">
-                    <div className="flex items-center gap-2 mb-1">
+                <div className="bg-[#0a0e27] rounded-lg p-2.5 sm:p-3 border border-[#1e2a4a]">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
                         <Target className="w-3.5 h-3.5 text-slate-500" />
-                        <p className="text-slate-500 text-xs">Win Rate</p>
+                        <p className="text-slate-500 text-[10px] sm:text-xs">Win Rate</p>
                     </div>
-                    <p className={`text-2xl font-bold ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <p className={`text-xl sm:text-2xl font-bold ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {winRate.toFixed(1)}%
                     </p>
-                    <p className="text-slate-600 text-[10px] mt-1">{wins}W / {losses}L</p>
+                    <p className="text-slate-600 text-[9px] sm:text-[10px] mt-1">{wins}W / {losses}L</p>
                 </div>
 
                 {/* Total Profit */}
-                <div className="bg-[#0a0e27] rounded-lg p-3 border border-[#1e2a4a]">
-                    <div className="flex items-center gap-2 mb-1">
+                <div className="bg-[#0a0e27] rounded-lg p-2.5 sm:p-3 border border-[#1e2a4a]">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
                         {totalProfit >= 0 ? (
                             <TrendingUp className="w-3.5 h-3.5 text-slate-500" />
                         ) : (
                             <TrendingDown className="w-3.5 h-3.5 text-slate-500" />
                         )}
-                        <p className="text-slate-500 text-xs">Total P/L</p>
+                        <p className="text-slate-500 text-[10px] sm:text-xs">Total P/L</p>
                     </div>
-                    <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <p className={`text-xl sm:text-2xl font-bold ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         ${totalProfit.toFixed(2)}
                     </p>
-                    <p className="text-slate-600 text-[10px] mt-1">{totalTrades} trades</p>
+                    <p className="text-slate-600 text-[9px] sm:text-[10px] mt-1">{totalTrades} trades</p>
                 </div>
             </div>
 
             {/* Advanced Metrics */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {/* Average Win */}
-                <div className="bg-[#0a0e27] rounded-lg p-2.5 border border-[#1e2a4a]">
-                    <p className="text-slate-500 text-[10px] mb-1">Avg Win</p>
-                    <p className="text-emerald-400 font-bold text-sm">+${avgWin.toFixed(2)}</p>
+                <div className="bg-[#0a0e27] rounded-lg p-2 sm:p-2.5 border border-[#1e2a4a]">
+                    <p className="text-slate-500 text-[9px] sm:text-[10px] mb-1">Avg Win</p>
+                    <p className="text-emerald-400 font-bold text-xs sm:text-sm">+${avgWin.toFixed(2)}</p>
                 </div>
 
                 {/* Average Loss */}
-                <div className="bg-[#0a0e27] rounded-lg p-2.5 border border-[#1e2a4a]">
-                    <p className="text-slate-500 text-[10px] mb-1">Avg Loss</p>
-                    <p className="text-red-400 font-bold text-sm">-${avgLoss.toFixed(2)}</p>
+                <div className="bg-[#0a0e27] rounded-lg p-2 sm:p-2.5 border border-[#1e2a4a]">
+                    <p className="text-slate-500 text-[9px] sm:text-[10px] mb-1">Avg Loss</p>
+                    <p className="text-red-400 font-bold text-xs sm:text-sm">-${avgLoss.toFixed(2)}</p>
                 </div>
 
                 {/* Profit Factor */}
-                <div className="bg-[#0a0e27] rounded-lg p-2.5 border border-[#1e2a4a]">
-                    <p className="text-slate-500 text-[10px] mb-1">Profit Factor</p>
-                    <p className={`font-bold text-sm ${profitFactor >= 1.5 ? 'text-emerald-400' : profitFactor >= 1 ? 'text-amber-400' : 'text-red-400'}`}>
+                <div className="bg-[#0a0e27] rounded-lg p-2 sm:p-2.5 border border-[#1e2a4a]">
+                    <p className="text-slate-500 text-[9px] sm:text-[10px] mb-1">Profit Factor</p>
+                    <p className={`font-bold text-xs sm:text-sm ${profitFactor >= 1.5 ? 'text-emerald-400' : profitFactor >= 1 ? 'text-amber-400' : 'text-red-400'}`}>
                         {profitFactor.toFixed(2)}x
                     </p>
                 </div>
 
                 {/* Efficiency */}
-                <div className="bg-[#0a0e27] rounded-lg p-2.5 border border-[#1e2a4a] flex items-center justify-between">
+                <div className="bg-[#0a0e27] rounded-lg p-2 sm:p-2.5 border border-[#1e2a4a] flex items-center justify-between">
                     <div>
-                        <p className="text-slate-500 text-[10px] mb-1">Efficiency</p>
-                        <p className="text-blue-400 font-bold text-sm">{efficiencyScore}%</p>
+                        <p className="text-slate-500 text-[9px] sm:text-[10px] mb-1">Efficiency</p>
+                        <p className="text-blue-400 font-bold text-xs sm:text-sm">{efficiencyScore}%</p>
                     </div>
-                    <Award className="w-4 h-4 text-blue-400/50" />
+                    <Award className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400/50 hidden sm:block" />
                 </div>
             </div>
 

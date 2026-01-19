@@ -105,46 +105,56 @@ const BotControls: React.FC = () => {
   const losses = totalTrades - wins;
 
   return (
-    <div className="bg-[#0f1629] rounded-xl border border-[#1e2a4a] p-5 shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${isRunning ? 'bg-emerald-500/20' : 'bg-slate-700/50'}`}>
-            <Zap className={`w-5 h-5 ${isRunning ? 'text-emerald-400' : 'text-slate-400'}`} />
+    <div className="bg-[#0f1629] rounded-xl border border-[#1e2a4a] p-4 sm:p-5 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <div className="flex items-center justify-between sm:justify-start gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${isRunning ? 'bg-emerald-500/20' : 'bg-slate-700/50'}`}>
+              <Zap className={`w-5 h-5 ${isRunning ? 'text-emerald-400' : 'text-slate-400'}`} />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-base sm:text-lg text-nowrap">Bot Controls</h3>
+              <p className="text-slate-400 text-xs sm:text-sm">
+                {isRunning ? 'Bot is active' : 'Ready to trade'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-white font-semibold text-lg">Bot Controls</h3>
-            <p className="text-slate-400 text-sm">
-              {isRunning ? 'Bot is active' : 'Ready to trade'}
-            </p>
-          </div>
+
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="sm:hidden text-slate-400 hover:text-white transition-colors p-2"
+          >
+            {showSettings ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center justify-between sm:justify-end gap-2">
           {/* Performance Badges */}
           {totalTrades > 0 && (
-            <div className="flex gap-2 mr-2">
+            <div className="flex flex-wrap gap-2">
               {/* Win Rate Badge */}
-              <div className={`px-2.5 py-1 rounded-md ${winRate >= 50 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+              <div className={`px-2 py-1 rounded-md ${winRate >= 50 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                 <div className="flex items-center gap-1.5">
                   <Target className={`w-3 h-3 ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`} />
-                  <span className={`text-xs font-medium ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-[10px] sm:text-xs font-medium ${winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {winRate.toFixed(0)}%
                   </span>
                 </div>
               </div>
 
               {/* P/L Badge */}
-              <div className={`px-2.5 py-1 rounded-md ${totalProfit >= 0 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+              <div className={`px-2 py-1 rounded-md ${totalProfit >= 0 ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className={`w-3 h-3 ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
-                  <span className={`text-xs font-bold font-mono ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-[10px] sm:text-xs font-bold font-mono ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     ${totalProfit.toFixed(2)}
                   </span>
                 </div>
               </div>
 
               {/* Risk Status Badge */}
-              <div className="px-2.5 py-1 rounded-md bg-slate-700/30 border border-slate-600/30">
-                <span className={`text-xs font-medium ${riskStatus.color}`}>
+              <div className="px-2 py-1 rounded-md bg-slate-700/30 border border-slate-600/30 hidden min-[400px]:block">
+                <span className={`text-[10px] sm:text-xs font-medium ${riskStatus.color}`}>
                   {riskStatus.label}
                 </span>
               </div>
@@ -153,7 +163,7 @@ const BotControls: React.FC = () => {
 
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="text-slate-400 hover:text-white transition-colors p-2"
+            className="hidden sm:block text-slate-400 hover:text-white transition-colors p-2"
           >
             {showSettings ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </button>

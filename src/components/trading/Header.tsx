@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
-import { 
-  Settings, 
-  HelpCircle, 
+import {
+  Settings,
+  HelpCircle,
   ExternalLink,
   Menu,
   X
@@ -21,7 +21,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
   const { connectionStatus, accountInfo, accountType } = useTradingContext();
   const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const isConnected = connectionStatus === 'connected';
 
   return (
@@ -36,30 +36,28 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            
+
             <div className="flex items-center gap-3">
               <div className="relative">
                 <Logo showText={false} className="w-10 h-10 flex items-center justify-center" />
                 {isConnected && (
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0f1629] ${
-                    accountType === 'real' ? 'bg-amber-400' : 'bg-blue-400'
-                  }`} />
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0f1629] ${accountType === 'real' ? 'bg-amber-400' : 'bg-blue-400'
+                    }`} />
                 )}
               </div>
               <div>
-                <h1 className="text-white font-bold text-xl tracking-tight">
+                <h1 className="text-white font-bold text-lg sm:text-xl tracking-tight">
                   Kyros <span className="text-blue-400">Signalist</span>
                 </h1>
                 <div className="flex items-center gap-2">
-                  <p className="text-slate-500 text-xs">
+                  <p className="text-slate-500 text-[10px] sm:text-xs hidden min-[400px]:block">
                     Automated Trading Bot
                   </p>
                   {isConnected && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
-                      accountType === 'real' 
-                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                    <span className={`text-[9px] min-[400px]:text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${accountType === 'real'
+                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                         : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                    }`}>
+                      }`}>
                       {accountType}
                     </span>
                   )}
@@ -70,12 +68,11 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
 
           {/* Center - Quick Stats (Desktop) */}
           {isConnected && accountInfo && (
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden lg:flex items-center gap-6">
               <div className="text-center">
                 <p className="text-slate-500 text-xs">Balance</p>
-                <p className={`font-semibold font-mono ${
-                  accountType === 'real' ? 'text-emerald-400' : 'text-blue-400'
-                }`}>
+                <p className={`font-semibold font-mono ${accountType === 'real' ? 'text-emerald-400' : 'text-blue-400'
+                  }`}>
                   ${accountInfo.balance.toFixed(2)}
                 </p>
               </div>
@@ -90,17 +87,18 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
           )}
 
           {/* Right - Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <a
               href="https://app.deriv.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 transition-all text-sm"
+              className="p-2 sm:px-3 sm:py-2 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 transition-all text-sm flex items-center gap-1.5"
+              title="Deriv Account"
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>Deriv</span>
+              <ExternalLink className="w-4 h-4 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Deriv</span>
             </a>
-            
+
             <button
               onClick={() => setShowHelp(true)}
               className="p-2 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 transition-all"
@@ -108,7 +106,7 @@ const Header: React.FC<HeaderProps> = ({ sidebarOpen, toggleSidebar }) => {
             >
               <HelpCircle className="w-5 h-5" />
             </button>
-            
+
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 transition-all"

@@ -17,6 +17,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUser } from '@clerk/clerk-react';
+import {
+  loadKyrosConfig,
+  saveKyrosConfig,
+  KyrosConfig,
+  VolatilityLevel
+} from '@/config/kyrosConfig';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -37,6 +43,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [showRealToken, setShowRealToken] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Kyros Strategy Settings
+  const [kyrosConfig, setKyrosConfig] = useState<KyrosConfig>(loadKyrosConfig());
+
   useEffect(() => {
     if (isLoaded && user) {
       const metadata = user.unsafeMetadata as {
@@ -55,6 +64,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         setTheme(metadata.settings.theme ?? 'dark');
       }
     }
+
+    // Load Kyros config on mount
+    setKyrosConfig(loadKyrosConfig());
   }, [isLoaded, user]);
 
   if (!isOpen) return null;
@@ -85,6 +97,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         autoReconnect,
         theme
       }));
+
+      // Save Kyros Strategy Configuration
+      saveKyrosConfig(kyrosConfig);
 
       toast.success('Settings and tokens saved successfully');
       onClose();
@@ -305,9 +320,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Max Consecutive Losses</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.maxConsecutiveLosses}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, maxConsecutiveLosses: val },
+                        trend: { ...prev.trend, maxConsecutiveLosses: val },
+                        reversal: { ...prev.reversal, maxConsecutiveLosses: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="2">2 losses</option>
-                    <option value="3" selected>3 losses</option>
+                    <option value="3">3 losses</option>
                     <option value="4">4 losses</option>
                     <option value="5">5 losses</option>
                   </select>
@@ -315,9 +342,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Daily Loss Limit</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.dailyLossLimitPercent}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, dailyLossLimitPercent: val },
+                        trend: { ...prev.trend, dailyLossLimitPercent: val },
+                        reversal: { ...prev.reversal, dailyLossLimitPercent: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="5">5%</option>
-                    <option value="10" selected>10%</option>
+                    <option value="10">10%</option>
                     <option value="15">15%</option>
                     <option value="20">20%</option>
                   </select>
@@ -325,19 +364,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Min Win Rate Threshold</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.minWinRateThreshold}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, minWinRateThreshold: val },
+                        trend: { ...prev.trend, minWinRateThreshold: val },
+                        reversal: { ...prev.reversal, minWinRateThreshold: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="50">50%</option>
                     <option value="55">55%</option>
-                    <option value="60" selected>60%</option>
+                    <option value="60">60%</option>
                     <option value="65">65%</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Stake Reduction</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.stakeReductionPercent}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, stakeReductionPercent: val },
+                        trend: { ...prev.trend, stakeReductionPercent: val },
+                        reversal: { ...prev.reversal, stakeReductionPercent: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="20">20%</option>
-                    <option value="30" selected>30%</option>
+                    <option value="30">30%</option>
                     <option value="40">40%</option>
                     <option value="50">50%</option>
                   </select>
@@ -348,16 +411,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-[#0a0e27] rounded-lg border border-[#1e2a4a]">
                   <span className="text-white text-xs">Auto-Pause on Loss Limit</span>
-                  <div className="w-8 h-4 rounded-full bg-blue-500 relative">
-                    <div className="w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 right-0.5"></div>
-                  </div>
+                  <button
+                    onClick={() => setKyrosConfig(prev => ({
+                      ...prev,
+                      scalper: { ...prev.scalper, autoPauseOnLossLimit: !prev.scalper.autoPauseOnLossLimit },
+                      trend: { ...prev.trend, autoPauseOnLossLimit: !prev.trend.autoPauseOnLossLimit },
+                      reversal: { ...prev.reversal, autoPauseOnLossLimit: !prev.reversal.autoPauseOnLossLimit }
+                    }))}
+                    className={`w-8 h-4 rounded-full transition-colors relative ${kyrosConfig.scalper.autoPauseOnLossLimit ? 'bg-blue-500' : 'bg-slate-700'}`}
+                  >
+                    <div className={`w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${kyrosConfig.scalper.autoPauseOnLossLimit ? 'left-[18px]' : 'left-0.5'}`} />
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-between p-2 bg-[#0a0e27] rounded-lg border border-[#1e2a4a]">
                   <span className="text-white text-xs">Reduce Stake After Loss</span>
-                  <div className="w-8 h-4 rounded-full bg-blue-500 relative">
-                    <div className="w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 right-0.5"></div>
-                  </div>
+                  <button
+                    onClick={() => setKyrosConfig(prev => ({
+                      ...prev,
+                      scalper: { ...prev.scalper, reduceStakeAfterLoss: !prev.scalper.reduceStakeAfterLoss },
+                      trend: { ...prev.trend, reduceStakeAfterLoss: !prev.trend.reduceStakeAfterLoss },
+                      reversal: { ...prev.reversal, reduceStakeAfterLoss: !prev.reversal.reduceStakeAfterLoss }
+                    }))}
+                    className={`w-8 h-4 rounded-full transition-colors relative ${kyrosConfig.scalper.reduceStakeAfterLoss ? 'bg-blue-500' : 'bg-slate-700'}`}
+                  >
+                    <div className={`w-3 h-3 rounded-full bg-white shadow-md absolute top-0.5 transition-all ${kyrosConfig.scalper.reduceStakeAfterLoss ? 'left-[18px]' : 'left-0.5'}`} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -369,9 +448,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Momentum Threshold</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.momentumThreshold}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, momentumThreshold: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="0.0001">Very Low</option>
-                    <option value="0.0002" selected>Low</option>
+                    <option value="0.0002">Low</option>
                     <option value="0.0003">Medium</option>
                     <option value="0.0005">High</option>
                   </select>
@@ -379,9 +468,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 <div>
                   <label className="text-[10px] text-slate-500 ml-1 mb-1 block">Volatility Filter</label>
-                  <select className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all">
+                  <select
+                    value={kyrosConfig.scalper.volatilityFilter}
+                    onChange={(e) => {
+                      const val = e.target.value as VolatilityLevel;
+                      setKyrosConfig(prev => ({
+                        ...prev,
+                        scalper: { ...prev.scalper, volatilityFilter: val }
+                      }));
+                    }}
+                    className="w-full bg-[#0a0e27] border border-[#1e2a4a] rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-blue-500 transition-all"
+                  >
                     <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
+                    <option value="medium">Medium</option>
                     <option value="high">High</option>
                   </select>
                 </div>
