@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
+import { useAppContext } from '@/contexts/AppContext';
 import {
   History,
   TrendingUp,
@@ -13,17 +14,24 @@ import {
 
 const TradeLog: React.FC = () => {
   const { tradeHistory, resetHistory, totalProfit, winRate, totalTrades } = useTradingContext();
-  const [currentPage, setCurrentPage] = useState(1);
+  const { tradeLogPage: currentPage, setTradeLogPage: setCurrentPage } = useAppContext();
   const itemsPerPage = 10;
 
   const totalPages = Math.ceil(tradeHistory.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages || 1);
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage;
   const displayedTrades = tradeHistory.slice(startIndex, startIndex + itemsPerPage);
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage);
+    }
+  }, [currentPage, safeCurrentPage, setCurrentPage]);
 
   const handleExportCSV = () => {
     if (tradeHistory.length === 0) return;
 
-    const headers = ['Timestamp', 'Account', 'Contract Type', 'Symbol', 'Entry Price', 'Exit Price', 'Stake', 'Profit', 'Result'];
+    const headers = ['Timestamp', 'Account', 'Contract Type', 'Symbol', 'Entry Price', 'Exit Price', 'Stake', 'Confidence', 'Strategy', 'Profit', 'Result'];
     const rows = tradeHistory.map(trade => [
       new Date(trade.timestamp).toLocaleString(),
       trade.accountType || 'unknown',
@@ -32,6 +40,8 @@ const TradeLog: React.FC = () => {
       trade.entryPrice.toFixed(2),
       trade.exitPrice.toFixed(2),
       trade.stake.toFixed(2),
+      trade.confidence?.toFixed(0) || '',
+      trade.strategy || '',
       trade.profit.toFixed(2),
       trade.result
     ]);
@@ -129,7 +139,7 @@ const TradeLog: React.FC = () => {
               {displayedTrades.map((trade, index) => (
                 <div
                   key={trade.id}
-                  className={`grid grid-cols-12 gap-2 px-3 py-3 text-sm border-b border-[#1e2a4a] hover:bg-[#0a0e27] transition-colors ${index === 0 && currentPage === 1 ? 'bg-blue-500/5' : ''
+                  className={`grid grid-cols-12 gap-2 px-3 py-3 text-sm border-b border-[#1e2a4a] hover:bg-[#0a0e27] transition-colors ${index === 0 && safeCurrentPage === 1 ? 'bg-blue-500/5' : ''
                     }`}
                 >
                   <div className="col-span-1 text-slate-400 font-mono text-[10px] flex items-center">
@@ -141,7 +151,8 @@ const TradeLog: React.FC = () => {
                       {trade.accountType === 'real' ? 'R' : 'D'}
                     </span>
                   </div>
-                  <div className="col-span-2 flex items-center gap-1">
+                  <div className="col-span-2 flex flex-col justify-center gap-0.5">
+                    <div className="flex items-center gap-1">
                     {trade.contractType === 'CALL' ? (
                       <TrendingUp className="w-3 h-3 text-emerald-400" />
                     ) : (
@@ -150,6 +161,10 @@ const TradeLog: React.FC = () => {
                     <span className={`text-xs ${trade.contractType === 'CALL' ? 'text-emerald-400' : 'text-red-400'}`}>
                       {trade.contractType}
                     </span>
+                    </div>
+                    {trade.confidence && (
+                      <span className="text-[9px] text-blue-400 font-mono">{trade.confidence}% AI</span>
+                    )}
                   </div>
                   <div className="col-span-2 text-white font-mono text-xs">
                     {trade.entryPrice.toFixed(2)}
@@ -180,18 +195,18 @@ const TradeLog: React.FC = () => {
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                  disabled={safeCurrentPage === 1}
                   className="p-1 rounded bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <span className="text-xs text-slate-400 px-2">
-                  {currentPage} / {totalPages || 1}
+                  {safeCurrentPage} / {totalPages || 1}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
+                  disabled={safeCurrentPage === totalPages || totalPages === 0}
                   className="p-1 rounded bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <ChevronRight className="w-4 h-4" />

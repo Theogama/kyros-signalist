@@ -22,6 +22,9 @@ export interface TradeResult {
   duration: number;
   symbol: string;
   accountType: 'demo' | 'real';
+  confidence?: number;
+  strategy?: string;
+  marketCondition?: string;
 }
 
 export interface AccountInfo {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
+import { useAppContext } from '@/contexts/AppContext';
 import {
   Play,
   Square,
@@ -11,7 +12,9 @@ import {
   ChevronUp,
   Target,
   BarChart,
-  Repeat
+  Repeat,
+  BrainCircuit,
+  Gauge,
 } from 'lucide-react';
 
 const SYMBOLS = [
@@ -59,9 +62,11 @@ const BotControls: React.FC = () => {
     totalTrades,
     winRate,
     totalProfit,
+    aiAnalysis,
+    safetyState,
   } = useTradingContext();
+  const { botSettingsOpen: showSettings, setBotSettingsOpen: setShowSettings } = useAppContext();
 
-  const [showSettings, setShowSettings] = useState(true);
   const [showConfirmStop, setShowConfirmStop] = useState(false);
   const [showRealConfirm, setShowRealConfirm] = useState(false);
 
@@ -182,6 +187,21 @@ const BotControls: React.FC = () => {
               <label className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2 block">Kyros Premium Strategies</label>
               <div className="grid grid-cols-1 gap-2">
                 <button
+                  onClick={() => setContractType('kyros_ai')}
+                  disabled={isRunning}
+                  className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-between gap-2 ${contractType === 'kyros_ai'
+                    ? 'bg-blue-500/20 border-2 border-blue-500 text-blue-400'
+                    : 'bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:border-slate-600'
+                    } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <BrainCircuit className="w-4 h-4" />
+                    <span>Adaptive AI</span>
+                  </div>
+                  <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-400">AUTO</span>
+                </button>
+
+                <button
                   onClick={() => setContractType('kyros_trend')}
                   disabled={isRunning}
                   className={`py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-between gap-2 ${contractType === 'kyros_trend'
@@ -290,6 +310,33 @@ const BotControls: React.FC = () => {
         </div>
       )}
 
+      {/* AI Gate Status */}
+      {aiAnalysis && (
+        <div className={`mb-4 p-3 rounded-lg border ${aiAnalysis.safeToTrade
+          ? 'bg-emerald-500/10 border-emerald-500/30'
+          : aiAnalysis.verdict === 'RISKY'
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-red-500/10 border-red-500/30'
+          }`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Gauge className={`w-4 h-4 ${aiAnalysis.confidence >= 90 ? 'text-emerald-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-red-400'}`} />
+              <span className="text-white text-sm font-medium">AI Confidence</span>
+            </div>
+            <span className={`font-mono font-bold ${aiAnalysis.confidence >= 90 ? 'text-emerald-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+              {aiAnalysis.confidence}%
+            </span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs">
+            <span className="text-slate-400">{aiAnalysis.verdict}</span>
+            <span className="text-slate-500 capitalize">{aiAnalysis.activeStrategy.replace('_', ' ')}</span>
+          </div>
+          {safetyState?.pauseRequired && (
+            <p className="text-red-400 text-xs mt-2">Auto pause protection active</p>
+          )}
+        </div>
+      )}
+
       {/* Current Trade Status */}
       {currentTrade && (
         <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
@@ -300,6 +347,11 @@ const BotControls: React.FC = () => {
           <p className="text-slate-400 text-xs">
             {currentTrade.direction} @ {currentTrade.entryPrice?.toFixed(2)}
           </p>
+          {currentTrade.confidence && (
+            <p className="text-blue-300 text-xs mt-1">
+              Confidence {currentTrade.confidence}% | {String(currentTrade.strategy).replace('_', ' ')}
+            </p>
+          )}
         </div>
       )}
 
@@ -350,6 +402,12 @@ const BotControls: React.FC = () => {
                 <span className="text-slate-500">Stake Amount:</span>
                 <span className="text-amber-400 font-bold">${stakeAmount.toFixed(2)}</span>
               </div>
+              {aiAnalysis && (
+                <div className="flex justify-between text-sm mt-2">
+                  <span className="text-slate-500">AI Gate:</span>
+                  <span className="text-blue-400 font-bold">{aiAnalysis.confidence}%</span>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">

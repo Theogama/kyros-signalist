@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   X,
   FileText,
-  Settings2
+  Settings2,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,11 +19,13 @@ const QuickActions: React.FC = () => {
     disconnect, 
     connectionStatus,
     isRunning,
-    stopBot
+    stopBot,
+    startNewSession
   } = useTradingContext();
 
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
+  const [showConfirmNewSession, setShowConfirmNewSession] = useState(false);
 
   const isConnected = connectionStatus === 'connected';
 
@@ -69,6 +72,11 @@ const QuickActions: React.FC = () => {
     setShowConfirmDisconnect(false);
   };
 
+  const handleStartNewSession = () => {
+    startNewSession();
+    setShowConfirmNewSession(false);
+  };
+
   return (
     <>
       <div className="bg-[#0f1629] rounded-xl border border-[#1e2a4a] p-5 shadow-lg">
@@ -112,16 +120,23 @@ const QuickActions: React.FC = () => {
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
             >
               <RefreshCw className="w-4 h-4" />
-              <span className="flex-1 text-left text-sm">Disconnect & Reset</span>
+              <span className="flex-1 text-left text-sm">Disconnect</span>
             </button>
           )}
+
+          <button
+            onClick={() => setShowConfirmNewSession(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-300 hover:text-white hover:border-amber-500/40 transition-all"
+          >
+            <RotateCcw className="w-4 h-4 text-amber-400" />
+            <span className="flex-1 text-left text-sm">Start New Session</span>
+          </button>
         </div>
 
         {/* Info */}
         <div className="mt-4 p-3 bg-[#0a0e27] rounded-lg border border-[#1e2a4a]">
           <p className="text-slate-500 text-xs">
-            Trade history is stored locally and will be lost when you close the browser.
-            Export your data regularly.
+            Workspace state auto-saves locally and restores after refresh across desktop and mobile.
           </p>
         </div>
       </div>
@@ -200,6 +215,45 @@ const QuickActions: React.FC = () => {
                 className="flex-1 py-3 px-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all"
               >
                 Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm New Session Modal */}
+      {showConfirmNewSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0f1629] border border-[#1e2a4a] rounded-xl p-6 max-w-sm w-full">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <h3 className="text-white font-semibold text-lg">Start New Session?</h3>
+              </div>
+              <button
+                onClick={() => setShowConfirmNewSession(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-slate-400 mb-6">
+              This resets the saved workspace, stops the bot, disconnects Deriv, and clears local session history.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmNewSession(false)}
+                className="flex-1 py-3 px-4 rounded-lg bg-[#0a0e27] border border-[#1e2a4a] text-slate-400 hover:text-white hover:border-slate-600 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStartNewSession}
+                className="flex-1 py-3 px-4 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 transition-all"
+              >
+                Start New
               </button>
             </div>
           </div>

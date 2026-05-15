@@ -6,14 +6,21 @@ import { useUser } from '@clerk/clerk-react';
 import {
   loadKyrosConfig,
   KyrosConfig,
-  calculateVolatility,
-  calculateMomentum,
-  detectConsecutiveDirection,
-  calculateTrendStrength,
-  calculateSMA
 } from '@/config/kyrosConfig';
+import {
+  analyzeMarket,
+  buildSafetyState,
+  getDynamicStake,
+} from '@/lib/marketIntelligence';
+import type { ChartAnalysis, SafetyState } from '@/lib/marketIntelligence';
+import {
+  clearWorkspaceSession,
+  loadWorkspaceSession,
+  migrateAnonymousSession,
+  saveWorkspaceSession,
+} from '@/lib/sessionPersistence';
 
-export type ContractType = 'scalping' | 'rise_fall' | 'kyros_trend' | 'kyros_scalper' | 'kyros_reversal';
+export type ContractType = 'scalping' | 'rise_fall' | 'kyros_ai' | 'kyros_trend' | 'kyros_scalper' | 'kyros_reversal';
 export type AccountType = 'demo' | 'real';
 
 interface TradingContextType {
@@ -27,6 +34,8 @@ interface TradingContextType {
   tradeHistory: TradeResult[];
   isRunning: boolean;
   currentTrade: any | null;
+  aiAnalysis: ChartAnalysis | null;
+  safetyState: SafetyState | null;
 
   // Settings
   contractType: ContractType;
@@ -45,6 +54,7 @@ interface TradingContextType {
   startBot: () => void;
   stopBot: () => void;
   resetHistory: () => void;
+  startNewSession: () => void;
   setContractType: (type: ContractType) => void;
   setStakeAmount: (amount: number) => void;
   setSelectedSymbol: (symbol: string) => void;
@@ -62,6 +72,9 @@ export const useTradingContext = () => {
 
 export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoaded } = useUser();
+  const userId = user?.id;
+  const hasHydratedRef = useRef(false);
+  const resumeBotAfterReconnectRef = useRef(false);
   // Connection state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
@@ -72,9 +85,11 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [tradeHistory, setTradeHistory] = useState<TradeResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTrade, setCurrentTrade] = useState<any | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<ChartAnalysis | null>(null);
+  const [safetyState, setSafetyState] = useState<SafetyState | null>(null);
 
   // Settings
-  const [contractType, setContractType] = useState<ContractType>('rise_fall');
+  const [contractType, setContractType] = useState<ContractType>('kyros_ai');
   const [stakeAmount, setStakeAmount] = useState(1);
   const [selectedSymbol, setSelectedSymbol] = useState('R_100');
 
@@ -83,6 +98,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const lastTickRef = useRef<TickData | null>(null);
   const tickCountRef = useRef(0);
   const tradeInProgressRef = useRef(false);
+  const currentTradeRef = useRef<any | null>(null);
 
   // Kyros strategy refs for risk management
   const kyrosConfigRef = useRef<KyrosConfig>(loadKyrosConfig());
@@ -155,16 +171,35 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccountInfo(null);
     setTicks([]);
     setIsRunning(false);
+    setCurrentTrade(null);
+    currentTradeRef.current = null;
     isRunningRef.current = false;
     toast.info('Disconnected from Deriv');
   }, [handleAccountUpdate, handleMT5Update]);
 
   // Execute trade based on tick analysis
-  const executeTrade = useCallback(async (direction: 'CALL' | 'PUT', currentTick: TickData) => {
+  const executeTrade = useCallback(async (direction: 'CALL' | 'PUT', currentTick: TickData, analysis: ChartAnalysis) => {
     if (tradeInProgressRef.current || !accountInfo) return;
 
+    const safety = buildSafetyState({
+      ticks,
+      tradeHistory,
+      accountInfo,
+      accountType,
+      selectedStrategy: contractType,
+      baseStake: stakeAmount,
+      sessionStartBalance: sessionStartBalanceRef.current,
+      consecutiveLosses: consecutiveLossesRef.current,
+      lastTradeTime: lastTradeTimeRef.current,
+    });
+    const dynamicStake = getDynamicStake(stakeAmount, analysis, safety, accountType);
+
+    if (!analysis.safeToTrade || dynamicStake <= 0) {
+      return;
+    }
+
     // Check balance
-    if (accountInfo.balance < stakeAmount) {
+    if (accountInfo.balance < dynamicStake) {
       toast.error('Insufficient balance', {
         description: 'Please add funds or reduce stake amount',
       });
@@ -178,7 +213,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       // Get proposal
-      const duration = contractType === 'scalping' ? 1 : 5;
+      const duration = analysis.suggestedDuration || (contractType === 'scalping' ? 1 : 5);
       const durationUnit = 't';
 
       // Determine correct symbol parameters
@@ -187,7 +222,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       const proposal = await derivWS.getProposal({
         contractType: direction,
-        amount: stakeAmount,
+        amount: dynamicStake,
         duration: symbolDuration,
         durationUnit: durationUnit,
         symbol: selectedSymbol,
@@ -211,21 +246,28 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const contractId = buyResult.buy.contract_id;
       const entryPrice = currentTick.quote;
 
-      setCurrentTrade({
+      const tradeSnapshot = {
         contractId,
         direction,
         entryPrice,
-        stake: stakeAmount,
+        stake: dynamicStake,
         timestamp: tradeStartTime,
         accountType,
         symbol: selectedSymbol,
-      });
+        confidence: analysis.confidence,
+        strategy: analysis.activeStrategy,
+        marketCondition: analysis.marketCondition,
+      };
+      setCurrentTrade(tradeSnapshot);
+      currentTradeRef.current = tradeSnapshot;
+      lastTradeTimeRef.current = tradeStartTime;
+      currentStakeRef.current = dynamicStake;
 
       // Subscribe to contract updates
       derivWS.subscribeToContract(contractId);
 
       toast.info('Trade placed', {
-        description: `${direction} contract at ${currentTick.quote.toFixed(2)}`,
+        description: `${direction} @ ${currentTick.quote.toFixed(2)} | Confidence ${analysis.confidence}%`,
       });
 
     } catch (error: any) {
@@ -234,7 +276,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       tradeInProgressRef.current = false;
     }
-  }, [accountInfo, stakeAmount, contractType, selectedSymbol]);
+  }, [accountInfo, stakeAmount, contractType, selectedSymbol, accountType, ticks, tradeHistory]);
 
   // Analyze tick and decide trade
   const analyzeTickAndTrade = useCallback((tick: TickData) => {
@@ -290,135 +332,85 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
+    const analysisTicks = [...ticks.slice(-119), tick];
+    const analysis = analyzeMarket({
+      ticks: analysisTicks,
+      tradeHistory,
+      accountInfo,
+      accountType,
+      selectedStrategy: contractType,
+      baseStake: stakeAmount,
+      sessionStartBalance: sessionStartBalanceRef.current,
+      consecutiveLosses: consecutiveLossesRef.current,
+      lastTradeTime: lastTradeTimeRef.current,
+    });
+    const safety = buildSafetyState({
+      ticks: analysisTicks,
+      tradeHistory,
+      accountInfo,
+      accountType,
+      selectedStrategy: contractType,
+      baseStake: stakeAmount,
+      sessionStartBalance: sessionStartBalanceRef.current,
+      consecutiveLosses: consecutiveLossesRef.current,
+      lastTradeTime: lastTradeTimeRef.current,
+    });
+    setAiAnalysis(analysis);
+    setSafetyState(safety);
+
+    if (safety.emergencyStop || safety.dailyLossLimitHit || safety.maxDrawdownHit) {
+      toast.error('Emergency stop activated', {
+        description: 'AI risk controls halted trading to protect the account.',
+      });
+      setIsRunning(false);
+      isRunningRef.current = false;
+      derivWS.unsubscribeTicks();
+      lastTickRef.current = tick;
+      return;
+    }
+
+    if (safety.pauseRequired) {
+      toast.warning('Auto pause activated', {
+        description: `${safety.consecutiveLosses} consecutive losses detected.`,
+      });
+      setIsRunning(false);
+      isRunningRef.current = false;
+      derivWS.unsubscribeTicks();
+      lastTickRef.current = tick;
+      return;
+    }
+
+    if (!analysis.safeToTrade || !analysis.recommendedDirection) {
+      lastTickRef.current = tick;
+      return;
+    }
+
     if (lastTick) {
       const priceDiff = tick.quote - lastTick.quote;
-      const prices = ticks.slice(-20).map(t => t.quote);
-      prices.push(tick.quote);
+      const prices = analysisTicks.slice(-80).map(t => t.quote);
+      const direction = analysis.recommendedDirection;
+      const activeStrategy = analysis.activeStrategy;
 
       // Enhanced Kyros Strategies Logic
-      if (contractType === 'kyros_trend') {
-        // ENHANCED TREND STRATEGY: Multi-indicator approach
-        const config = kyrosConfigRef.current.trend;
-        const window = config.trendConfirmationPeriod;
-
-        if (prices.length >= window) {
-          const recentPrices = prices.slice(-window);
-
-          // Calculate trend strength
-          const trendStrength = calculateTrendStrength(recentPrices, window);
-          const momentum = calculateMomentum(recentPrices);
-
-          // Calculate moving average for trend confirmation
-          const sma = calculateSMA(recentPrices, Math.floor(window / 2));
-          const currentPrice = tick.quote;
-
-          // Trend direction
-          const isUptrend = currentPrice > sma && momentum > 0;
-          const isDowntrend = currentPrice < sma && momentum < 0;
-
-          // Only trade if trend strength is sufficient
-          if (trendStrength >= config.trendConfidenceThreshold &&
-            Math.abs(momentum) >= config.minTrendStrength) {
-
-            // Trade on trend confirmation with reduced frequency for quality
-            if (tickCountRef.current % 7 === 0) {
-              if (isUptrend) {
-                executeTrade('CALL', tick);
-              } else if (isDowntrend) {
-                executeTrade('PUT', tick);
-              }
-            }
-          }
+      if (activeStrategy === 'kyros_trend') {
+        if (analysis.structure.regime === 'trending' && tickCountRef.current % 4 === 0) {
+          executeTrade(direction, tick, analysis);
         }
-      } else if (contractType === 'kyros_scalper') {
-        // ENHANCED SCALPER STRATEGY: High-frequency with strict filters
-        const config = kyrosConfigRef.current.scalper;
-        const tickCount = config.tickConfirmationCount;
-
-        if (prices.length >= tickCount + 2) {
-          // Check consecutive direction
-          const direction = detectConsecutiveDirection(prices, config.consecutiveTicksRequired);
-
-          // Calculate volatility for filtering
-          const recentPrices = prices.slice(-5);
-          const volatility = calculateVolatility(recentPrices);
-
-          // Volatility filter based on config
-          const volatilityThresholds = {
-            low: { min: 0.00005, max: 0.005 },
-            medium: { min: 0.0001, max: 0.01 },
-            high: { min: 0.0002, max: 0.02 }
-          };
-
-          const threshold = volatilityThresholds[config.volatilityFilter];
-          const volatilityOk = volatility >= threshold.min && volatility <= threshold.max;
-
-          // Calculate momentum
-          const momentum = calculateMomentum(recentPrices);
-          const momentumStrong = Math.abs(momentum) >= config.momentumThreshold;
-
-          // Trade only when all conditions align
-          if (direction !== 'none' && volatilityOk && momentumStrong) {
-            const tradeDirection = direction === 'up' ? 'CALL' : 'PUT';
-            executeTrade(tradeDirection, tick);
-          }
+      } else if (activeStrategy === 'kyros_scalper') {
+        if (analysis.structure.regime === 'scalping' && tickCountRef.current % 3 === 0) {
+          executeTrade(direction, tick, analysis);
         }
-      } else if (contractType === 'kyros_reversal') {
-        // ENHANCED REVERSAL STRATEGY: Multi-timeframe mean reversion
-        const config = kyrosConfigRef.current.reversal;
-
-        if (config.multiTimeframeAnalysis && prices.length >= config.longWindow) {
-          // Analyze multiple timeframes
-          const shortPrices = prices.slice(-config.shortWindow);
-          const mediumPrices = prices.slice(-config.mediumWindow);
-          const longPrices = prices.slice(-config.longWindow);
-
-          // Calculate momentum for each timeframe
-          const shortMomentum = calculateMomentum(shortPrices);
-          const mediumMomentum = calculateMomentum(mediumPrices);
-          const longMomentum = calculateMomentum(longPrices);
-
-          // Calculate mean for mean reversion
-          const longSMA = calculateSMA(longPrices, config.longWindow);
-          const currentPrice = tick.quote;
-          const deviation = ((currentPrice - longSMA) / longSMA) * 100;
-
-          // Detect overbought/oversold conditions
-          const isOverbought = deviation >= config.overboughtThreshold;
-          const isOversold = deviation <= -config.oversoldThreshold;
-
-          // Reversal confirmation: short-term momentum opposes longer-term
-          let reversalConfirmed = true;
-          if (config.reversalConfirmation) {
-            if (isOverbought) {
-              // For overbought, we want to see weakening momentum
-              reversalConfirmed = shortMomentum < mediumMomentum;
-            } else if (isOversold) {
-              // For oversold, we want to see strengthening momentum
-              reversalConfirmed = shortMomentum > mediumMomentum;
-            }
-          }
-
-          // Execute reversal trades
-          if (reversalConfirmed && tickCountRef.current % 4 === 0) {
-            if (isOverbought) {
-              executeTrade('PUT', tick); // Price too high, expect drop
-            } else if (isOversold) {
-              executeTrade('CALL', tick); // Price too low, expect rise
-            }
-          }
+      } else if (activeStrategy === 'kyros_reversal') {
+        if (analysis.structure.reversalSignal !== 'none' && tickCountRef.current % 4 === 0) {
+          executeTrade(direction, tick, analysis);
         }
       } else if (contractType === 'scalping') {
-        // Basic Scalping: Trade every 3 ticks based on direction
-        if (tickCountRef.current % 3 === 0) {
-          const direction = priceDiff > 0 ? 'CALL' : 'PUT';
-          executeTrade(direction, tick);
+        if (tickCountRef.current % 5 === 0 && Math.sign(priceDiff) !== 0) {
+          executeTrade(direction, tick, analysis);
         }
       } else {
-        // Rise/Fall: Trade every 5 ticks based on trend
-        if (tickCountRef.current % 5 === 0) {
-          const direction = priceDiff > 0 ? 'CALL' : 'PUT';
-          executeTrade(direction, tick);
+        if (tickCountRef.current % 6 === 0 && prices.length > 25) {
+          executeTrade(direction, tick, analysis);
         }
       }
     }
@@ -446,6 +438,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     sessionStartBalanceRef.current = accountInfo.balance;
     consecutiveLossesRef.current = 0;
     currentStakeRef.current = stakeAmount;
+    lastTradeTimeRef.current = 0;
     kyrosConfigRef.current = loadKyrosConfig();
 
     setIsRunning(true);
@@ -473,6 +466,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isRunningRef.current = false;
     derivWS.unsubscribeTicks();
     setCurrentTrade(null);
+    currentTradeRef.current = null;
     toast.info('Bot stopped');
   }, []);
 
@@ -481,6 +475,242 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTradeHistory([]);
     toast.info('Trade history cleared');
   }, []);
+
+  const startNewSession = useCallback(() => {
+    derivWS.off('account_info_updated', handleAccountUpdate);
+    derivWS.off('mt5_accounts_updated', handleMT5Update);
+    derivWS.disconnect();
+    clearWorkspaceSession(userId, 'new-session');
+    setConnectionStatus('disconnected');
+    setAccountInfo(null);
+    setAccountTypeState('demo');
+    setTicks([]);
+    setTradeHistory([]);
+    setIsRunning(false);
+    setCurrentTrade(null);
+    setAiAnalysis(null);
+    setSafetyState(null);
+    setContractType('kyros_ai');
+    setStakeAmount(1);
+    setSelectedSymbol('R_100');
+    isRunningRef.current = false;
+    lastTickRef.current = null;
+    tickCountRef.current = 0;
+    tradeInProgressRef.current = false;
+    currentTradeRef.current = null;
+    consecutiveLossesRef.current = 0;
+    sessionStartBalanceRef.current = 0;
+    currentStakeRef.current = 1;
+    lastTradeTimeRef.current = 0;
+    resumeBotAfterReconnectRef.current = false;
+    window.dispatchEvent(new CustomEvent('kyros:workspace-reset', { detail: { source: 'trading' } }));
+    toast.success('New session started');
+  }, [handleAccountUpdate, handleMT5Update, userId]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    migrateAnonymousSession(userId);
+    const session = loadWorkspaceSession(userId);
+    const trading = session?.trading;
+
+    if (trading) {
+      setAccountTypeState(trading.accountType ?? 'demo');
+      setSelectedSymbol(trading.selectedSymbol ?? 'R_100');
+      setContractType(trading.contractType ?? 'kyros_ai');
+      setStakeAmount(trading.stakeAmount ?? 1);
+      setTradeHistory(trading.tradeHistory ?? []);
+      setTicks(trading.ticks ?? []);
+      setCurrentTrade(trading.currentTrade ?? null);
+      setAccountInfo(trading.accountInfo ?? null);
+      setAiAnalysis(trading.aiAnalysis ?? null);
+      setSafetyState(trading.safetyState ?? null);
+
+      const restoredIsRunning = Boolean(trading.isRunning && trading.shouldReconnect);
+      setIsRunning(restoredIsRunning);
+      isRunningRef.current = restoredIsRunning;
+      currentTradeRef.current = trading.currentTrade ?? null;
+      sessionStartBalanceRef.current = trading.sessionStartBalance ?? 0;
+      consecutiveLossesRef.current = trading.consecutiveLosses ?? 0;
+      currentStakeRef.current = trading.currentStake ?? (trading.stakeAmount ?? 1);
+      lastTradeTimeRef.current = trading.lastTradeTime ?? 0;
+      resumeBotAfterReconnectRef.current = Boolean(trading.shouldResumeBot);
+    }
+
+    hasHydratedRef.current = true;
+  }, [isLoaded, userId]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current || !isLoaded || !user) return;
+    const session = loadWorkspaceSession(userId);
+    const trading = session?.trading;
+
+    if (!trading?.shouldReconnect || connectionStatus !== 'disconnected') return;
+
+    const metadata = user.unsafeMetadata as {
+      demoToken?: string;
+      realToken?: string;
+      settings?: { autoReconnect?: boolean };
+    };
+    const autoReconnect = metadata.settings?.autoReconnect ?? true;
+    const tokenToUse = (trading.accountType === 'real' ? metadata.realToken : metadata.demoToken) || '';
+
+    if (!autoReconnect || !tokenToUse) {
+      setIsRunning(false);
+      isRunningRef.current = false;
+      resumeBotAfterReconnectRef.current = false;
+      return;
+    }
+
+    connect(tokenToUse).catch(() => {
+      setIsRunning(false);
+      isRunningRef.current = false;
+      resumeBotAfterReconnectRef.current = false;
+    });
+  }, [connect, connectionStatus, isLoaded, user, userId]);
+
+  useEffect(() => {
+    if (connectionStatus !== 'connected' || !resumeBotAfterReconnectRef.current || isRunning) return;
+
+    resumeBotAfterReconnectRef.current = false;
+    const timeout = window.setTimeout(() => {
+      startBot();
+      toast.success('Trading session restored', {
+        description: 'Connection and bot state resumed from your last workspace.',
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [connectionStatus, isRunning, startBot]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+
+    const snapshot = {
+      accountType,
+      selectedSymbol,
+      contractType,
+      stakeAmount,
+      tradeHistory,
+      ticks,
+      isRunning,
+      currentTrade,
+      accountInfo,
+      aiAnalysis,
+      safetyState,
+      sessionStartBalance: sessionStartBalanceRef.current,
+      consecutiveLosses: consecutiveLossesRef.current,
+      currentStake: currentStakeRef.current,
+      lastTradeTime: lastTradeTimeRef.current,
+      shouldReconnect: connectionStatus === 'connected' || connectionStatus === 'connecting' || isRunning,
+      shouldResumeBot: isRunning,
+    };
+
+    const save = () => saveWorkspaceSession(userId, { trading: snapshot });
+    const timeout = window.setTimeout(save, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    accountInfo,
+    accountType,
+    aiAnalysis,
+    connectionStatus,
+    contractType,
+    currentTrade,
+    isRunning,
+    safetyState,
+    selectedSymbol,
+    stakeAmount,
+    ticks,
+    tradeHistory,
+    userId,
+  ]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+
+    const saveBeforeUnload = () => {
+      saveWorkspaceSession(userId, {
+        trading: {
+          accountType,
+          selectedSymbol,
+          contractType,
+          stakeAmount,
+          tradeHistory,
+          ticks,
+          isRunning,
+          currentTrade,
+          accountInfo,
+          aiAnalysis,
+          safetyState,
+          sessionStartBalance: sessionStartBalanceRef.current,
+          consecutiveLosses: consecutiveLossesRef.current,
+          currentStake: currentStakeRef.current,
+          lastTradeTime: lastTradeTimeRef.current,
+          shouldReconnect: connectionStatus === 'connected' || connectionStatus === 'connecting' || isRunning,
+          shouldResumeBot: isRunning,
+        },
+      });
+    };
+
+    window.addEventListener('beforeunload', saveBeforeUnload);
+    window.addEventListener('pagehide', saveBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', saveBeforeUnload);
+      window.removeEventListener('pagehide', saveBeforeUnload);
+    };
+  }, [
+    accountInfo,
+    accountType,
+    aiAnalysis,
+    connectionStatus,
+    contractType,
+    currentTrade,
+    isRunning,
+    safetyState,
+    selectedSymbol,
+    stakeAmount,
+    ticks,
+    tradeHistory,
+    userId,
+  ]);
+
+  useEffect(() => {
+    const handleWorkspaceReset = (event: Event) => {
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source;
+      if (source === 'trading') return;
+
+      derivWS.off('account_info_updated', handleAccountUpdate);
+      derivWS.off('mt5_accounts_updated', handleMT5Update);
+      derivWS.disconnect();
+      setConnectionStatus('disconnected');
+      setAccountInfo(null);
+      setAccountTypeState('demo');
+      setTicks([]);
+      setTradeHistory([]);
+      setIsRunning(false);
+      setCurrentTrade(null);
+      setAiAnalysis(null);
+      setSafetyState(null);
+      setContractType('kyros_ai');
+      setStakeAmount(1);
+      setSelectedSymbol('R_100');
+      isRunningRef.current = false;
+      lastTickRef.current = null;
+      tickCountRef.current = 0;
+      tradeInProgressRef.current = false;
+      currentTradeRef.current = null;
+      consecutiveLossesRef.current = 0;
+      sessionStartBalanceRef.current = 0;
+      currentStakeRef.current = 1;
+      lastTradeTimeRef.current = 0;
+      resumeBotAfterReconnectRef.current = false;
+    };
+
+    window.addEventListener('kyros:workspace-reset', handleWorkspaceReset);
+    return () => window.removeEventListener('kyros:workspace-reset', handleWorkspaceReset);
+  }, [handleAccountUpdate, handleMT5Update]);
 
   // Set up event listeners
   useEffect(() => {
@@ -529,10 +759,14 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           duration: contract.tick_count || 0,
           symbol: contract.underlying || selectedSymbol,
           accountType: accountType,
+          confidence: currentTradeRef.current?.confidence,
+          strategy: currentTradeRef.current?.strategy,
+          marketCondition: currentTradeRef.current?.marketCondition,
         };
 
         setTradeHistory(prev => [result, ...prev].slice(0, 50));
         setCurrentTrade(null);
+        currentTradeRef.current = null;
         tradeInProgressRef.current = false;
 
         // Update consecutive losses counter
@@ -606,6 +840,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         tradeHistory,
         isRunning,
         currentTrade,
+        aiAnalysis,
+        safetyState,
         contractType,
         stakeAmount,
         selectedSymbol,
@@ -618,6 +854,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         startBot,
         stopBot,
         resetHistory,
+        startNewSession,
         setContractType,
         setStakeAmount,
         setSelectedSymbol,

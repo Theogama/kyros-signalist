@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTradingContext } from '@/contexts/TradingContext';
+import { useAppContext } from '@/contexts/AppContext';
 import Header from './Header';
 import StatusBar from './StatusBar';
 import ConnectForm from './ConnectForm';
@@ -12,14 +13,25 @@ import QuickActions from './QuickActions';
 import WelcomePanel from './WelcomePanel';
 import LiveIndicator from './LiveIndicator';
 import StrategyPerformance from './StrategyPerformance';
+import AISmartPanel from './AISmartPanel';
 
 const TradingDashboard: React.FC = () => {
   const { connectionStatus, isRunning } = useTradingContext();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, setSidebarOpen, toggleSidebar, mainScrollTop, setMainScrollTop } = useAppContext();
+  const mainRef = useRef<HTMLElement>(null);
 
   const isConnected = connectionStatus === 'connected';
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  useEffect(() => {
+    if (!mainRef.current) return;
+    mainRef.current.scrollTop = mainScrollTop;
+  }, [mainScrollTop]);
+
+  const handleMainScroll = () => {
+    if (mainRef.current) {
+      setMainScrollTop(mainRef.current.scrollTop);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0e27] flex flex-col">
@@ -64,13 +76,20 @@ const TradingDashboard: React.FC = () => {
         )}
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main
+          ref={mainRef}
+          onScroll={handleMainScroll}
+          className="flex-1 overflow-y-auto p-4 lg:p-6"
+        >
           {!isConnected ? (
             <WelcomePanel />
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 h-full">
               {/* Left Column */}
               <div className="space-y-4 lg:space-y-6">
+                {/* AI Market Intelligence */}
+                <AISmartPanel />
+
                 {/* Strategy Performance */}
                 <StrategyPerformance />
 

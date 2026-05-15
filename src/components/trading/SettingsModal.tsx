@@ -47,6 +47,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [kyrosConfig, setKyrosConfig] = useState<KyrosConfig>(loadKyrosConfig());
 
   useEffect(() => {
+    try {
+      const localSettings = localStorage.getItem('kyros-settings');
+      if (localSettings) {
+        const parsed = JSON.parse(localSettings);
+        setSoundEnabled(parsed.soundEnabled ?? true);
+        setNotifications(parsed.notifications ?? true);
+        setAutoReconnect(parsed.autoReconnect ?? true);
+        setTheme(parsed.theme ?? 'dark');
+      }
+    } catch (error) {
+      console.warn('Failed to load local settings:', error);
+    }
+
     if (isLoaded && user) {
       const metadata = user.unsafeMetadata as {
         demoToken?: string;
@@ -68,6 +81,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     // Load Kyros config on mount
     setKyrosConfig(loadKyrosConfig());
   }, [isLoaded, user]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      localStorage.setItem('kyros-settings', JSON.stringify({
+        soundEnabled,
+        notifications,
+        autoReconnect,
+        theme
+      }));
+      saveKyrosConfig(kyrosConfig);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [autoReconnect, kyrosConfig, notifications, soundEnabled, theme]);
 
   if (!isOpen) return null;
 

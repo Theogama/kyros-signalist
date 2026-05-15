@@ -22,6 +22,7 @@ const StatusBar: React.FC = () => {
     totalTrades,
     winRate,
     accountType,
+    aiAnalysis,
   } = useTradingContext();
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -71,6 +72,10 @@ const StatusBar: React.FC = () => {
       default: return 'Disconnected';
     }
   };
+
+  const strategyLabel = contractType === 'kyros_ai'
+    ? `AI: ${aiAnalysis?.activeStrategy.replace('_', ' ') ?? 'standby'}`
+    : contractType.replace('_', ' ');
 
   return (
     <div className="bg-[#0a0e27] border-b border-[#1e2a4a] px-4 py-2">
@@ -131,10 +136,18 @@ const StatusBar: React.FC = () => {
           {isRunning && (
             <div className="hidden md:flex items-center gap-2 text-slate-400">
               <span className="text-xs">
-                {contractType === 'scalping' ? 'Scalping' : 'Rise/Fall'}
+                {strategyLabel}
               </span>
               <span className="text-slate-600">|</span>
               <span className="text-xs font-mono">{selectedSymbol}</span>
+              {aiAnalysis && (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span className={`text-xs font-mono ${aiAnalysis.confidence >= 90 ? 'text-emerald-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {aiAnalysis.confidence}%
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
