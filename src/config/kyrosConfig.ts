@@ -53,6 +53,96 @@ export interface KyrosConfig {
   reversal: ReversalConfig;
 }
 
+export type RiskProfile = 'conservative' | 'balanced' | 'aggressive';
+export type EdgeTier = 'A' | 'B' | 'C' | 'reject';
+
+/** AI profitability / edge-gating configuration */
+export interface ProfitabilityConfig {
+  riskProfile: RiskProfile;
+  minEdgeScore: number;
+  minEdgeForHighStake: number;
+  minConfidenceOverride: number;
+  tierAStakeMultiplier: number;
+  tierBStakeMultiplier: number;
+  tierCStakeMultiplier: number;
+  lossCooldownMs: number;
+  maxConsecutiveLossesBeforeCooldown: number;
+  edgeDegradationWindow: number;
+  edgeDegradationFloor: number;
+  edgeDegradationPauseCount: number;
+  minProfitFactorForCalibration: number;
+  minExpectedProfitFactorForTrade: number;
+  minStrategyWinRate: number;
+  calibratedAt?: number;
+}
+
+export const PROFITABILITY_CALIBRATION_KEY = 'kyros_profitability_calibration';
+
+export const DEFAULT_PROFITABILITY_CONFIG: ProfitabilityConfig = {
+  riskProfile: 'aggressive',
+  minEdgeScore: 62,
+  minEdgeForHighStake: 78,
+  minConfidenceOverride: 72,
+  tierAStakeMultiplier: 1.35,
+  tierBStakeMultiplier: 1.0,
+  tierCStakeMultiplier: 0.65,
+  lossCooldownMs: 25_000,
+  maxConsecutiveLossesBeforeCooldown: 2,
+  edgeDegradationWindow: 8,
+  edgeDegradationFloor: 52,
+  edgeDegradationPauseCount: 4,
+  minProfitFactorForCalibration: 1.05,
+  minExpectedProfitFactorForTrade: 0.92,
+  minStrategyWinRate: 45,
+};
+
+export const CONSERVATIVE_PROFITABILITY: ProfitabilityConfig = {
+  ...DEFAULT_PROFITABILITY_CONFIG,
+  riskProfile: 'conservative',
+  minEdgeScore: 72,
+  minEdgeForHighStake: 85,
+  minConfidenceOverride: 85,
+  tierAStakeMultiplier: 0.85,
+  tierBStakeMultiplier: 0.65,
+  tierCStakeMultiplier: 0.45,
+  lossCooldownMs: 60_000,
+  maxConsecutiveLossesBeforeCooldown: 1,
+};
+
+export const AGGRESSIVE_PROFITABILITY: ProfitabilityConfig = {
+  ...DEFAULT_PROFITABILITY_CONFIG,
+  riskProfile: 'aggressive',
+  minEdgeScore: 58,
+  minEdgeForHighStake: 74,
+  minConfidenceOverride: 68,
+  tierAStakeMultiplier: 1.5,
+  tierBStakeMultiplier: 1.1,
+  tierCStakeMultiplier: 0.7,
+  lossCooldownMs: 18_000,
+  maxConsecutiveLossesBeforeCooldown: 3,
+  edgeDegradationFloor: 48,
+};
+
+export const loadProfitabilityConfig = (): ProfitabilityConfig => {
+  try {
+    const stored = localStorage.getItem('kyros_profitability_config');
+    if (stored) {
+      return { ...AGGRESSIVE_PROFITABILITY, ...JSON.parse(stored) };
+    }
+  } catch {
+    // ignore
+  }
+  return { ...AGGRESSIVE_PROFITABILITY };
+};
+
+export const saveProfitabilityConfig = (config: ProfitabilityConfig): void => {
+  try {
+    localStorage.setItem('kyros_profitability_config', JSON.stringify(config));
+  } catch (error) {
+    console.error('Failed to save profitability config:', error);
+  }
+};
+
 // Default configurations optimized for profitability
 export const DEFAULT_KYROS_CONFIG: KyrosConfig = {
   scalper: {

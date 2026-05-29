@@ -25,6 +25,8 @@ export interface TradeResult {
   confidence?: number;
   strategy?: string;
   marketCondition?: string;
+  edgeScore?: number;
+  edgeTier?: string;
 }
 
 export interface AccountInfo {

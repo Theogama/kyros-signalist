@@ -64,6 +64,7 @@ const BotControls: React.FC = () => {
     totalProfit,
     aiAnalysis,
     safetyState,
+    sessionPerformance,
   } = useTradingContext();
   const { botSettingsOpen: showSettings, setBotSettingsOpen: setShowSettings } = useAppContext();
 
@@ -312,18 +313,22 @@ const BotControls: React.FC = () => {
 
       {/* AI Gate Status */}
       {aiAnalysis && (
-        <div className={`mb-4 p-3 rounded-lg border ${aiAnalysis.safeToTrade
+        <div className={`mb-4 p-3 rounded-lg border ${aiAnalysis.shouldPlaceTrade
           ? 'bg-emerald-500/10 border-emerald-500/30'
-          : aiAnalysis.verdict === 'RISKY'
-            ? 'bg-amber-500/10 border-amber-500/30'
-            : 'bg-red-500/10 border-red-500/30'
+          : isRunning && aiAnalysis.safeToTrade
+            ? 'bg-blue-500/10 border-blue-500/30'
+            : aiAnalysis.verdict === 'RISKY'
+              ? 'bg-amber-500/10 border-amber-500/30'
+              : 'bg-slate-500/10 border-slate-500/30'
           }`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Gauge className={`w-4 h-4 ${aiAnalysis.confidence >= 90 ? 'text-emerald-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-red-400'}`} />
-              <span className="text-white text-sm font-medium">AI Confidence</span>
+              <Gauge className={`w-4 h-4 ${aiAnalysis.shouldPlaceTrade ? 'text-emerald-400' : isRunning ? 'text-blue-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-slate-400'}`} />
+              <span className="text-white text-sm font-medium">
+                {aiAnalysis.shouldPlaceTrade ? 'Quality Setup Ready' : isRunning ? 'Scanning Market' : 'AI Confidence'}
+              </span>
             </div>
-            <span className={`font-mono font-bold ${aiAnalysis.confidence >= 90 ? 'text-emerald-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+            <span className={`font-mono font-bold ${aiAnalysis.shouldPlaceTrade ? 'text-emerald-400' : isRunning ? 'text-blue-400' : aiAnalysis.confidence >= 70 ? 'text-amber-400' : 'text-slate-400'}`}>
               {aiAnalysis.confidence}%
             </span>
           </div>
@@ -331,6 +336,32 @@ const BotControls: React.FC = () => {
             <span className="text-slate-400">{aiAnalysis.verdict}</span>
             <span className="text-slate-500 capitalize">{aiAnalysis.activeStrategy.replace('_', ' ')}</span>
           </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <span className="text-slate-500 block">Edge</span>
+              <span className={`font-mono font-semibold ${aiAnalysis.shouldPlaceTrade ? 'text-emerald-400' : 'text-blue-400'}`}>
+                {aiAnalysis.edgeScore} ({aiAnalysis.edgeTier})
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Exp. PF</span>
+              <span className="text-slate-300 font-mono">{aiAnalysis.expectedProfitFactor.toFixed(2)}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Quality</span>
+              <span className="text-slate-300 font-mono capitalize">{aiAnalysis.setupQuality}</span>
+            </div>
+          </div>
+          {sessionPerformance && sessionPerformance.totalTrades > 0 && (
+            <p className="text-slate-500 text-xs mt-2">
+              Session PF {sessionPerformance.profitFactor.toFixed(2)} | WR {sessionPerformance.winRate.toFixed(1)}%
+            </p>
+          )}
+          {isRunning && !aiAnalysis.shouldPlaceTrade && aiAnalysis.safeToTrade && (
+            <p className="text-blue-400 text-xs mt-2">
+              Bot active — skipping low-quality ticks, waiting for profitable setup
+            </p>
+          )}
           {safetyState?.pauseRequired && (
             <p className="text-red-400 text-xs mt-2">Auto pause protection active</p>
           )}

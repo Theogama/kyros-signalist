@@ -6,7 +6,16 @@ import { useUser } from '@clerk/clerk-react';
 import {
   loadKyrosConfig,
   KyrosConfig,
+  loadProfitabilityConfig,
+  type ProfitabilityConfig,
 } from '@/config/kyrosConfig';
+import {
+  calibrateProfitability,
+  loadCalibratedProfitability,
+  mergeProfitabilityConfig,
+  saveCalibratedProfitability,
+} from '@/lib/simulationCalibrator';
+import { computeSessionPerformance } from '@/lib/performanceTracker';
 import {
   analyzeMarket,
   buildSafetyState,
@@ -36,6 +45,7 @@ interface TradingContextType {
   currentTrade: any | null;
   aiAnalysis: ChartAnalysis | null;
   safetyState: SafetyState | null;
+  sessionPerformance: ReturnType<typeof computeSessionPerformance> | null;
 
   // Settings
   contractType: ContractType;
@@ -102,16 +112,46 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Kyros strategy refs for risk management
   const kyrosConfigRef = useRef<KyrosConfig>(loadKyrosConfig());
+  const profitabilityRef = useRef<ProfitabilityConfig>(
+    mergeProfitabilityConfig(loadProfitabilityConfig(), loadCalibratedProfitability())
+  );
   const consecutiveLossesRef = useRef(0);
   const sessionStartBalanceRef = useRef(0);
   const currentStakeRef = useRef(stakeAmount);
   const lastTradeTimeRef = useRef(0);
+  const lossCooldownUntilRef = useRef(0);
+  const recentEdgeSamplesRef = useRef<number[]>([]);
+  const lastCalibrationRef = useRef(0);
 
   // Calculate stats
   const totalProfit = tradeHistory.reduce((sum, trade) => sum + trade.profit, 0);
   const wins = tradeHistory.filter(t => t.result === 'win').length;
   const winRate = tradeHistory.length > 0 ? (wins / tradeHistory.length) * 100 : 0;
   const totalTrades = tradeHistory.length;
+  const sessionPerformance = computeSessionPerformance(
+    tradeHistory,
+    sessionStartBalanceRef.current,
+    accountInfo?.balance ?? 0
+  );
+
+  const runCalibration = useCallback(() => {
+    if (ticks.length < 40) return;
+    const result = calibrateProfitability(
+      ticks,
+      tradeHistory,
+      accountType,
+      contractType,
+      stakeAmount,
+      profitabilityRef.current
+    );
+    if (!result) return;
+    profitabilityRef.current = mergeProfitabilityConfig(profitabilityRef.current, result.appliedConfig);
+    saveCalibratedProfitability(result);
+    lastCalibrationRef.current = Date.now();
+    toast.info('AI thresholds calibrated', {
+      description: `Edge ${result.best.minEdgeScore}+ | Win rate ${result.best.winRate.toFixed(1)}% | PF ${result.best.profitFactor.toFixed(2)}`,
+    });
+  }, [ticks, tradeHistory, accountType, contractType, stakeAmount]);
 
   // Handle account info updates
   const handleAccountUpdate = useCallback((updatedInfo: AccountInfo) => {
@@ -192,9 +232,19 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       consecutiveLosses: consecutiveLossesRef.current,
       lastTradeTime: lastTradeTimeRef.current,
     });
-    const dynamicStake = getDynamicStake(stakeAmount, analysis, safety, accountType);
+    const dynamicStake = getDynamicStake(
+      stakeAmount,
+      analysis,
+      safety,
+      accountType,
+      profitabilityRef.current
+    );
 
-    if (!analysis.safeToTrade || dynamicStake <= 0) {
+    if (!analysis.shouldPlaceTrade || dynamicStake <= 0) {
+      return;
+    }
+
+    if (Date.now() < lossCooldownUntilRef.current) {
       return;
     }
 
@@ -257,6 +307,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         confidence: analysis.confidence,
         strategy: analysis.activeStrategy,
         marketCondition: analysis.marketCondition,
+        edgeScore: analysis.edgeScore,
+        edgeTier: analysis.edgeTier,
       };
       setCurrentTrade(tradeSnapshot);
       currentTradeRef.current = tradeSnapshot;
@@ -333,6 +385,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const analysisTicks = [...ticks.slice(-119), tick];
+    const profitability = profitabilityRef.current;
+
     const analysis = analyzeMarket({
       ticks: analysisTicks,
       tradeHistory,
@@ -343,6 +397,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       sessionStartBalance: sessionStartBalanceRef.current,
       consecutiveLosses: consecutiveLossesRef.current,
       lastTradeTime: lastTradeTimeRef.current,
+      profitability,
+      recentEdgeSamples: recentEdgeSamplesRef.current,
     });
     const safety = buildSafetyState({
       ticks: analysisTicks,
@@ -357,6 +413,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
     setAiAnalysis(analysis);
     setSafetyState(safety);
+
+    recentEdgeSamplesRef.current = [...recentEdgeSamplesRef.current, analysis.edgeScore].slice(-profitability.edgeDegradationWindow);
 
     if (safety.emergencyStop || safety.dailyLossLimitHit || safety.maxDrawdownHit) {
       toast.error('Emergency stop activated', {
@@ -380,7 +438,12 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
-    if (!analysis.safeToTrade || !analysis.recommendedDirection) {
+    if (!analysis.shouldPlaceTrade || !analysis.recommendedDirection) {
+      lastTickRef.current = tick;
+      return;
+    }
+
+    if (Date.now() < lossCooldownUntilRef.current) {
       lastTickRef.current = tick;
       return;
     }
@@ -416,7 +479,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     lastTickRef.current = tick;
-  }, [contractType, executeTrade, ticks, accountInfo, tradeHistory]);
+  }, [contractType, executeTrade, ticks, accountInfo, tradeHistory, accountType, stakeAmount]);
 
   // Start bot
   const startBot = useCallback(() => {
@@ -440,6 +503,13 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     currentStakeRef.current = stakeAmount;
     lastTradeTimeRef.current = 0;
     kyrosConfigRef.current = loadKyrosConfig();
+    profitabilityRef.current = mergeProfitabilityConfig(
+      loadProfitabilityConfig(),
+      loadCalibratedProfitability()
+    );
+    lossCooldownUntilRef.current = 0;
+
+    runCalibration();
 
     setIsRunning(true);
     isRunningRef.current = true;
@@ -458,7 +528,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         description: 'Ensure your account has permissions for Forex/Commodities',
       });
     }
-  }, [connectionStatus, accountInfo, stakeAmount, selectedSymbol, contractType, accountType]);
+  }, [connectionStatus, accountInfo, stakeAmount, selectedSymbol, contractType, accountType, runCalibration]);
 
   // Stop bot
   const stopBot = useCallback(() => {
@@ -503,6 +573,12 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     currentStakeRef.current = 1;
     lastTradeTimeRef.current = 0;
     resumeBotAfterReconnectRef.current = false;
+    profitabilityRef.current = mergeProfitabilityConfig(
+      loadProfitabilityConfig(),
+      loadCalibratedProfitability()
+    );
+    recentEdgeSamplesRef.current = [];
+    lossCooldownUntilRef.current = 0;
     window.dispatchEvent(new CustomEvent('kyros:workspace-reset', { detail: { source: 'trading' } }));
     toast.success('New session started');
   }, [handleAccountUpdate, handleMT5Update, userId]);
@@ -762,6 +838,8 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           confidence: currentTradeRef.current?.confidence,
           strategy: currentTradeRef.current?.strategy,
           marketCondition: currentTradeRef.current?.marketCondition,
+          edgeScore: currentTradeRef.current?.edgeScore,
+          edgeTier: currentTradeRef.current?.edgeTier,
         };
 
         setTradeHistory(prev => [result, ...prev].slice(0, 50));
@@ -777,6 +855,10 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
         } else {
           consecutiveLossesRef.current++;
+          const prof = profitabilityRef.current;
+          if (consecutiveLossesRef.current >= prof.maxConsecutiveLossesBeforeCooldown) {
+            lossCooldownUntilRef.current = Date.now() + prof.lossCooldownMs;
+          }
 
           // Apply stake reduction if configured
           const config = kyrosConfigRef.current;
@@ -820,7 +902,14 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     derivWS.on('contract_update', handleContractUpdate);
     derivWS.on('error', handleError);
 
+    const calibrationInterval = window.setInterval(() => {
+      if (!isRunningRef.current || ticks.length < 40) return;
+      if (Date.now() - lastCalibrationRef.current < 10 * 60 * 1000) return;
+      runCalibration();
+    }, 5 * 60 * 1000);
+
     return () => {
+      window.clearInterval(calibrationInterval);
       derivWS.off('status', handleStatus);
       derivWS.off('tick', handleTick);
       derivWS.off('balance', handleBalance);
@@ -828,7 +917,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       derivWS.off('contract_update', handleContractUpdate);
       derivWS.off('error', handleError);
     };
-  }, [analyzeTickAndTrade, stakeAmount, selectedSymbol, accountType]);
+  }, [analyzeTickAndTrade, stakeAmount, selectedSymbol, accountType, contractType, runCalibration, ticks.length]);
 
   return (
     <TradingContext.Provider
@@ -842,6 +931,7 @@ export const TradingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         currentTrade,
         aiAnalysis,
         safetyState,
+        sessionPerformance,
         contractType,
         stakeAmount,
         selectedSymbol,

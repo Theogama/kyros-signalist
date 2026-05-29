@@ -4,11 +4,15 @@ import type {
   ContractType,
 } from '@/contexts/TradingContext';
 import {
+  AGGRESSIVE_PROFITABILITY,
   calculateMomentum,
   calculateSMA,
   calculateTrendStrength,
   calculateVolatility,
+  type EdgeTier,
+  type ProfitabilityConfig,
 } from '@/config/kyrosConfig';
+import { getStrategyWinRate } from '@/lib/performanceTracker';
 
 export type TradeVerdict = 'GOOD TO TRADE' | 'RISKY' | 'AVOID TRADE';
 export type MarketRegime = 'trending' | 'scalping' | 'volatile' | 'ranging' | 'unclear';
@@ -62,6 +66,13 @@ export interface ChartAnalysis {
   stakeMultiplier: number;
   suggestedDuration: number;
   generatedAt: number;
+  edgeScore: number;
+  edgeTier: EdgeTier;
+  passesEdgeGate: boolean;
+  shouldPlaceTrade: boolean;
+  setupQuality: 'premium' | 'good' | 'marginal' | 'skip';
+  strategyWinRate: number;
+  expectedProfitFactor: number;
 }
 
 export interface IntelligenceInput {
@@ -74,9 +85,78 @@ export interface IntelligenceInput {
   sessionStartBalance: number;
   consecutiveLosses: number;
   lastTradeTime: number;
+  profitability?: ProfitabilityConfig;
+  recentEdgeSamples?: number[];
+  calibrationMode?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+export const classifyEdgeTier = (edgeScore: number, minEdge: number, minHigh: number): EdgeTier => {
+  if (edgeScore < minEdge) return 'reject';
+  if (edgeScore >= minHigh) return 'A';
+  if (edgeScore >= minEdge + (minHigh - minEdge) * 0.45) return 'B';
+  return 'C';
+};
+
+/** Composite expected-edge score (0-100) for trade-quality gating */
+export const calculateEdgeScore = (params: {
+  confidence: number;
+  trendStrength: number;
+  riskRewardRatio: number;
+  fakeoutRisk: number;
+  manipulationRisk: number;
+  confirmationsCount: number;
+  warningsCount: number;
+  strategyWinRate: number;
+  regime: MarketRegime;
+  recentEdgeAvg?: number;
+  profitability: ProfitabilityConfig;
+}): number => {
+  const {
+    confidence,
+    trendStrength,
+    riskRewardRatio,
+    fakeoutRisk,
+    manipulationRisk,
+    confirmationsCount,
+    warningsCount,
+    strategyWinRate,
+    regime,
+    recentEdgeAvg = 0,
+    profitability,
+  } = params;
+
+  const regimeBonus =
+    regime === 'trending' ? 8 : regime === 'scalping' ? 6 : regime === 'ranging' ? -6 : -4;
+  const winRateBonus = clamp((strategyWinRate - 50) * 0.35, -12, 14);
+  const rrBonus = clamp(riskRewardRatio * 6, 0, 18);
+  const recentBonus = recentEdgeAvg > 0 ? clamp((recentEdgeAvg - 55) * 0.2, -8, 8) : 0;
+
+  let edge =
+    confidence * 0.42 +
+    trendStrength * 22 +
+    confirmationsCount * 2.5 +
+    rrBonus +
+    regimeBonus +
+    winRateBonus +
+    recentBonus -
+    fakeoutRisk * 0.12 -
+    manipulationRisk * 0.08 -
+    warningsCount * 4;
+
+  if (strategyWinRate < profitability.minStrategyWinRate && confirmationsCount < 5) {
+    edge -= 10;
+  }
+
+  return Math.round(clamp(edge, 0, 100));
+};
+
+export const getExpectedProfitFactor = (edgeScore: number, strategyWinRate: number): number => {
+  const impliedWin = clamp((edgeScore * 0.55 + strategyWinRate * 0.45) / 100, 0.35, 0.92);
+  const payout = 0.85;
+  return impliedWin > 0 ? (impliedWin * payout) / (1 - impliedWin) : 0;
+};
 
 const percentDistance = (price: number, reference: number | null) => {
   if (!reference) return 100;
@@ -190,6 +270,7 @@ export const analyzeMarket = (input: IntelligenceInput): ChartAnalysis => {
   const prices = ticks.map(t => t.quote);
   const current = prices[prices.length - 1] ?? 0;
   const profile = getAccountProfile(input.accountType);
+  const profitability = input.profitability ?? AGGRESSIVE_PROFITABILITY;
   const safety = buildSafetyState(input);
   const confirmations: string[] = [];
   const warnings: string[] = [];
@@ -228,6 +309,13 @@ export const analyzeMarket = (input: IntelligenceInput): ChartAnalysis => {
       stakeMultiplier: 0,
       suggestedDuration: 5,
       generatedAt: Date.now(),
+      edgeScore: 0,
+      edgeTier: 'reject',
+      passesEdgeGate: false,
+      shouldPlaceTrade: false,
+      setupQuality: 'skip',
+      strategyWinRate: 50,
+      expectedProfitFactor: 0,
     };
   }
 
@@ -352,32 +440,103 @@ export const analyzeMarket = (input: IntelligenceInput): ChartAnalysis => {
   confidence -= input.accountType === 'real' ? 5 : 0;
   confidence = Math.round(clamp(confidence, 0, 100));
 
-  const safeToTrade = confidence >= profile.minConfidence
-    && confirmations.length >= (input.accountType === 'real' ? 5 : 4)
-    && warnings.length <= (input.accountType === 'real' ? 1 : 2)
-    && !safety.dailyLossLimitHit
-    && !safety.maxDrawdownHit
-    && !safety.pauseRequired
-    && Date.now() - input.lastTradeTime >= profile.cooldownMs
-    && safety.riskExposurePercent <= profile.maxRiskPerTrade
-    && recommendedDirection !== null
-    && selectedStrategy !== 'standby';
+  const minConfidence = input.calibrationMode
+    ? profitability.minConfidenceOverride
+    : Math.max(profile.minConfidence, profitability.minConfidenceOverride);
+  const strategyWinRate = getStrategyWinRate(input.tradeHistory, selectedStrategy);
+  const recentEdgeAvg =
+    input.recentEdgeSamples && input.recentEdgeSamples.length > 0
+      ? input.recentEdgeSamples.reduce((a, b) => a + b, 0) / input.recentEdgeSamples.length
+      : 0;
 
-  const verdict: TradeVerdict = safeToTrade
+  const edgeScore = calculateEdgeScore({
+    confidence,
+    trendStrength,
+    riskRewardRatio,
+    fakeoutRisk,
+    manipulationRisk,
+    confirmationsCount: confirmations.length,
+    warningsCount: warnings.length,
+    strategyWinRate,
+    regime,
+    recentEdgeAvg,
+    profitability,
+  });
+
+  const edgeTier = classifyEdgeTier(
+    edgeScore,
+    profitability.minEdgeScore,
+    profitability.minEdgeForHighStake
+  );
+  const expectedProfitFactor = getExpectedProfitFactor(edgeScore, strategyWinRate);
+  const passesEdgeGate =
+    edgeTier !== 'reject' &&
+    edgeScore >= profitability.minEdgeScore &&
+    expectedProfitFactor >= profitability.minExpectedProfitFactorForTrade &&
+    strategyWinRate >= profitability.minStrategyWinRate - 15;
+
+  const passesSafetyGate =
+    !safety.dailyLossLimitHit &&
+    !safety.maxDrawdownHit &&
+    !safety.pauseRequired &&
+    !safety.emergencyStop &&
+    Date.now() - input.lastTradeTime >= profile.cooldownMs &&
+    safety.riskExposurePercent <= profile.maxRiskPerTrade;
+
+  const passesMarketStructure =
+    recommendedDirection !== null &&
+    selectedStrategy !== 'standby' &&
+    confirmations.length >= (input.accountType === 'real' ? 4 : 3) &&
+    warnings.length <= (input.accountType === 'real' ? 2 : 3);
+
+  const shouldPlaceTrade =
+    passesEdgeGate &&
+    passesSafetyGate &&
+    passesMarketStructure &&
+    confidence >= minConfidence;
+
+  const setupQuality: ChartAnalysis['setupQuality'] = !passesEdgeGate || edgeTier === 'reject'
+    ? 'skip'
+    : edgeTier === 'A'
+      ? 'premium'
+      : edgeTier === 'B'
+        ? 'good'
+        : 'marginal';
+
+  const safeToTrade = passesSafetyGate && passesMarketStructure && confidence >= minConfidence - 8;
+
+  const verdict: TradeVerdict = shouldPlaceTrade
     ? 'GOOD TO TRADE'
-    : confidence >= 70 && !safety.emergencyStop
+    : safeToTrade && !passesEdgeGate
       ? 'RISKY'
-      : 'AVOID TRADE';
+      : safeToTrade
+        ? 'RISKY'
+        : 'AVOID TRADE';
 
-  if (confidence >= 90) smartAlerts.push('Strong trade profile');
-  if (confidence >= 70 && confidence < 90) smartAlerts.push('Moderate setup, wait for extra confirmation');
-  if (verdict === 'AVOID TRADE') smartAlerts.push('AI safety gate blocking entries');
+  if (confidence >= 90 && shouldPlaceTrade) smartAlerts.push('Strong trade profile');
+  if (edgeTier === 'A' && shouldPlaceTrade) smartAlerts.push(`Tier-A edge (${edgeScore}) — high expectancy setup`);
+  if (edgeTier === 'B' && shouldPlaceTrade) smartAlerts.push(`Tier-B edge (${edgeScore}) — quality setup`);
+  if (edgeTier === 'C' && shouldPlaceTrade) smartAlerts.push(`Tier-C edge (${edgeScore}) — reduced size entry`);
+  if (safeToTrade && !shouldPlaceTrade) {
+    smartAlerts.push(`Scanning — edge ${edgeScore}/${profitability.minEdgeScore} (waiting for quality setup)`);
+  }
+  if (confidence >= 70 && confidence < 90 && shouldPlaceTrade) smartAlerts.push('Moderate setup confirmed');
+  if (verdict === 'AVOID TRADE' && !passesSafetyGate) smartAlerts.push('Safety limits active — bot still monitoring');
   if (safety.dailyTargetProgress >= 100) smartAlerts.push('Daily target reached. Consider locking profit.');
 
-  const stakeMultiplier = safeToTrade
+  const tierMultiplier =
+    edgeTier === 'A'
+      ? profitability.tierAStakeMultiplier
+      : edgeTier === 'B'
+        ? profitability.tierBStakeMultiplier
+        : edgeTier === 'C'
+          ? profitability.tierCStakeMultiplier
+          : 0;
+
+  const stakeMultiplier = shouldPlaceTrade
     ? input.accountType === 'real'
-      ? clamp(confidence / 100, 0.35, 0.85)
-      : clamp(confidence / 88, 0.5, 1.25)
+      ? clamp(tierMultiplier * (confidence / 100), 0.35, profitability.tierAStakeMultiplier)
+      : clamp(tierMultiplier * (confidence / 88), 0.45, profitability.tierAStakeMultiplier)
     : 0;
 
   return {
@@ -423,17 +582,34 @@ export const analyzeMarket = (input: IntelligenceInput): ChartAnalysis => {
     stakeMultiplier,
     suggestedDuration: selectedStrategy === 'kyros_scalper' ? 1 : selectedStrategy === 'kyros_trend' ? 5 : 3,
     generatedAt: Date.now(),
+    edgeScore,
+    edgeTier,
+    passesEdgeGate,
+    shouldPlaceTrade,
+    setupQuality,
+    strategyWinRate,
+    expectedProfitFactor,
   };
 };
 
-export const getDynamicStake = (baseStake: number, analysis: ChartAnalysis, safety: SafetyState, accountType: AccountType) => {
-  if (!analysis.safeToTrade) return 0;
+export const getDynamicStake = (
+  baseStake: number,
+  analysis: ChartAnalysis,
+  safety: SafetyState,
+  accountType: AccountType,
+  profitability?: ProfitabilityConfig
+) => {
+  if (!analysis.shouldPlaceTrade) return 0;
 
+  const prof = profitability ?? AGGRESSIVE_PROFITABILITY;
   let multiplier = analysis.stakeMultiplier;
-  if (safety.consecutiveLosses > 0) multiplier *= Math.pow(0.65, safety.consecutiveLosses);
-  if (safety.dailyPnLPercent < 0) multiplier *= 0.75;
-  if (safety.dailyTargetProgress >= 100) multiplier *= accountType === 'real' ? 0.2 : 0.5;
 
-  const minStake = 0.35;
-  return Math.max(minStake, Number((baseStake * clamp(multiplier, 0.1, 1.25)).toFixed(2)));
+  if (safety.consecutiveLosses > 0) multiplier *= Math.pow(0.6, safety.consecutiveLosses);
+  if (safety.dailyPnLPercent < 0) multiplier *= 0.7;
+  if (safety.dailyTargetProgress >= 100) multiplier *= accountType === 'real' ? 0.2 : 0.5;
+  if (analysis.expectedProfitFactor < prof.minExpectedProfitFactorForTrade) multiplier *= 0.5;
+
+  const minStake = accountType === 'real' ? 0.5 : 0.35;
+  const maxMultiplier = prof.tierAStakeMultiplier;
+  return Math.max(minStake, Number((baseStake * clamp(multiplier, 0.1, maxMultiplier)).toFixed(2)));
 };

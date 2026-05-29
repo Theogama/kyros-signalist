@@ -36,7 +36,7 @@ const BalanceBox: React.FC = () => {
         setDisplayBalance(targetBalance);
       }
     }
-  }, [accountInfo?.balance]);
+  }, [accountInfo?.balance, displayBalance]);
 
   const isConnected = connectionStatus === 'connected';
   const isProfitable = totalProfit > 0;
